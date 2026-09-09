@@ -15,6 +15,8 @@ import {
   Video,
   Check,
   CheckCircle2,
+  Clock,
+  ListChecks,
 } from 'lucide-react';
 import type { Course, CourseModule, CourseUnit } from '../../../types/models';
 import { useAuth } from '../../../context/AuthContext';
@@ -173,6 +175,14 @@ export const CurriculumBuilderPage: React.FC = () => {
     );
   }
 
+  const orderedUnits = [...(course.units || [])].sort((first, second) => first.order - second.order);
+  const standaloneModules = [...(course.modules || [])].sort((first, second) => first.order - second.order);
+  const totalLessons = [...orderedUnits.flatMap((unit) => unit.modules?.flatMap((module) => module.lessons || []) || []), ...standaloneModules.flatMap((module) => module.lessons || [])].length;
+  const completedLessonCount = [...completedLessons].filter((lessonUuid) =>
+    [...orderedUnits.flatMap((unit) => unit.modules?.flatMap((module) => module.lessons || []) || []), ...standaloneModules.flatMap((module) => module.lessons || [])]
+      .some((lesson) => lesson.uuid === lessonUuid),
+  ).length;
+
   return (
     <div className="space-y-6">
       {completionMessage && (
@@ -221,13 +231,27 @@ export const CurriculumBuilderPage: React.FC = () => {
         </div>
       </div>
 
+      <Card className="border-slate-200 bg-slate-50/70 p-4 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#73111b]">Course breakdown</p>
+            <p className="mt-1 text-xs text-slate-600">Work through each unit, module, and lesson in sequence.</p>
+          </div>
+          <div className="flex items-center gap-4 text-[11px] font-semibold text-slate-600">
+            <span className="inline-flex items-center gap-1.5"><ListChecks className="h-3.5 w-3.5 text-[#73111b]" /> {orderedUnits.length} Units</span>
+            <span className="inline-flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5 text-[#73111b]" /> {standaloneModules.length + orderedUnits.reduce((total, unit) => total + (unit.modules?.length || 0), 0)} Modules</span>
+            <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> {completedLessonCount}/{totalLessons} Lessons</span>
+          </div>
+        </div>
+      </Card>
+
       {/* Curriculum Module Tree */}
       <div className="space-y-4">
-        {course.units?.map((unit) => (
+        {orderedUnits.map((unit, unitIndex) => (
           <Card key={unit.uuid} className="p-5 border-[#fecdd3] bg-[#fffafb]">
             <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#fecdd3]">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#73111b]">Unit</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#73111b]">Unit {unitIndex + 1}</p>
                 <h2 className="text-base font-bold text-slate-900">{unit.title}</h2>
                 {unit.description && <p className="text-xs text-slate-500 mt-0.5">{unit.description}</p>}
               </div>
@@ -240,12 +264,15 @@ export const CurriculumBuilderPage: React.FC = () => {
               </button>
             </div>
             <div className="space-y-3 pl-3">
-              {unit.modules?.length ? unit.modules.map((module) => (
-                <div key={module.uuid} className="p-3 rounded-xl bg-white border border-slate-200">
+              {unit.modules?.length ? [...unit.modules].sort((first, second) => first.order - second.order).map((module, moduleIndex) => (
+                <div key={module.uuid} className="rounded-xl border border-slate-200 bg-white p-3">
                   <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold text-slate-900">{module.title}</p>
-                      <p className="text-[11px] text-slate-500">{module.lessons?.length || 0} lessons</p>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#fff1f2] text-[11px] font-bold text-[#73111b]">{unitIndex + 1}.{moduleIndex + 1}</span>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-bold text-slate-900">{module.title}</p>
+                        <p className="text-[11px] text-slate-500">{module.lessons?.length || 0} lessons</p>
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -260,9 +287,30 @@ export const CurriculumBuilderPage: React.FC = () => {
                       {collapsedModules.has(module.uuid) ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                     </button>
                   </div>
-                  {!collapsedModules.has(module.uuid) && <div className="mt-2 space-y-1">
-                    {module.lessons?.map((lesson) => <p key={lesson.uuid} className="text-[11px] text-slate-600 pl-2">{lesson.title}</p>)}
-                    {canManageCurriculum && <button onClick={() => { setSelectedModule(module); setAddLessonOpen(true); }} className="mt-2 text-[11px] font-bold text-[#73111b]">+ Add Lesson</button>}
+                  {!collapsedModules.has(module.uuid) && <div className="mt-3 space-y-2 border-t border-slate-100 pt-2">
+                    {[...(module.lessons || [])].sort((first, second) => first.order - second.order).map((lesson, lessonIndex) => (
+                      <button key={lesson.uuid} type="button" onClick={() => setActiveLesson(activeLesson === lesson.uuid ? null : lesson.uuid)} className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left hover:bg-slate-50">
+                        <span className="flex min-w-0 items-center gap-2">
+                          {completedLessons.has(lesson.uuid) ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> : <span className="w-3.5 shrink-0 text-center text-[10px] font-bold text-slate-400">{lessonIndex + 1}</span>}
+                          <span className={`truncate text-[11px] ${completedLessons.has(lesson.uuid) ? 'text-emerald-700 line-through' : 'text-slate-700'}`}>{lesson.title}</span>
+                        </span>
+                        <span className="inline-flex shrink-0 items-center gap-1 text-[10px] text-slate-400"><Clock className="h-3 w-3" /> {lesson.duration || 30}m</span>
+                      </button>
+                    ))}
+                    {activeLesson && module.lessons?.some((lesson) => lesson.uuid === activeLesson) && (() => {
+                      const lesson = module.lessons?.find((candidate) => candidate.uuid === activeLesson);
+                      return lesson ? (
+                        <div className="space-y-2 rounded-lg border border-[#fecdd3] bg-[#fffafb] p-3 text-xs text-slate-600">
+                          {lesson.description && <p>{lesson.description}</p>}
+                          {lesson.content && <p className="whitespace-pre-wrap text-slate-700">{lesson.content}</p>}
+                          {lesson.video_url && <a href={lesson.video_url} target="_blank" rel="noreferrer" className="inline-block font-bold text-[#73111b] hover:underline">Open lesson video</a>}
+                          {isStudent && <button type="button" disabled={completingLesson === lesson.uuid || completedLessons.has(lesson.uuid)} onClick={() => handleCompleteLesson(lesson.uuid)} className="inline-flex items-center gap-1.5 rounded-xl bg-[#73111b] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#5c0d15] disabled:cursor-not-allowed disabled:bg-emerald-600">
+                            {completingLesson === lesson.uuid ? 'Saving progress...' : completedLessons.has(lesson.uuid) ? <><Check className="h-3.5 w-3.5" /> Lesson completed</> : 'Mark lesson complete'}
+                          </button>}
+                        </div>
+                      ) : null;
+                    })()}
+                    {canManageCurriculum && <button onClick={() => { setSelectedModule(module); setAddLessonOpen(true); }} className="mt-1 text-[11px] font-bold text-[#73111b]">+ Add Lesson</button>}
                   </div>}
                 </div>
               )) : <p className="text-xs text-slate-400 italic">No modules in this unit yet.</p>}
@@ -270,7 +318,7 @@ export const CurriculumBuilderPage: React.FC = () => {
           </Card>
         ))}
 
-        {course.modules?.length === 0 && (course.units?.length || 0) === 0 ? (
+        {standaloneModules.length === 0 && orderedUnits.length === 0 ? (
           <Card className="text-center py-12">
             <BookOpen className="h-10 w-10 text-slate-400 mx-auto mb-2" />
             <h3 className="text-sm font-bold text-slate-800">{canManageCurriculum ? 'No Curriculum Modules Defined' : 'No lessons available yet'}</h3>
@@ -285,8 +333,10 @@ export const CurriculumBuilderPage: React.FC = () => {
               <Plus className="h-4 w-4" /> Add First Module
             </button>
           </Card>
-        ) : course.modules?.length ? (
-          course.modules?.map((module, mIdx) => (
+        ) : standaloneModules.length ? (
+          <div className="space-y-3">
+            {orderedUnits.length > 0 && <p className="px-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Additional modules</p>}
+          {standaloneModules.map((module, mIdx) => (
             <Card key={module.uuid} className="p-5 border-slate-200 bg-white">
               {/* Module Header */}
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
@@ -400,7 +450,8 @@ export const CurriculumBuilderPage: React.FC = () => {
                 )}
               </div>}
             </Card>
-          ))
+          ))}
+          </div>
         ) : null}
       </div>
 

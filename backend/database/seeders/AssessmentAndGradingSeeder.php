@@ -21,10 +21,10 @@ class AssessmentAndGradingSeeder extends Seeder
     {
         $org = Organization::first();
         $batch = CourseBatch::where('code', 'CCNA-2026-JAN-NRB')->first();
-        $trainer = User::where('email', 'trainer.nairobi@apexlms.test')->first();
+        $trainer = User::where('email', 'trainer.nairobi@iatlms.test')->first();
 
-        $studentJohn = User::where('email', 'student.john@apexlms.test')->first();
-        $studentJane = User::where('email', 'student.jane@apexlms.test')->first();
+        $studentJohn = User::where('email', 'student.john@iatlms.test')->first();
+        $studentJane = User::where('email', 'student.jane@iatlms.test')->first();
 
         // 1. Standard Grading Scheme
         $scheme = GradingScheme::create([

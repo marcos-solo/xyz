@@ -17,17 +17,49 @@ class AnnouncementController extends Controller
         $user = $request->user();
         $query = Announcement::with('creator')->latest('publish_at');
 
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $query->where(function ($builder) use ($search) {
+                $builder->where('title', 'like', "%{$search}%")
+                    ->orWhere('message', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->string('status')->toString());
+        }
+
+        if ($request->filled('target_type')) {
+            $query->where('target_type', $request->string('target_type')->toString());
+        }
+
+        if ($request->filled('from_date')) {
+            $query->whereDate('publish_at', '>=', $request->date('from_date'));
+        }
+
+        if ($request->filled('to_date')) {
+            $query->whereDate('publish_at', '<=', $request->date('to_date'));
+        }
+
         if ($user->hasRole('Student')) {
             $query->where('status', 'published')
                 ->where('publish_at', '<=', now())
                 ->where(function ($q) use ($user) {
                     $q->where('target_type', 'all')
-                      ->orWhere(fn($sq) => $sq->where('target_type', 'branch')->where('target_id', $user->branch_id))
-                      ->orWhere(fn($sq) => $sq->where('target_type', 'role')->where('target_id', 7)); // Student role
+                        ->orWhere(fn ($sq) => $sq->where('target_type', 'branch')->where('target_id', $user->branch_id))
+                        ->orWhere(fn ($sq) => $sq->where('target_type', 'role')->where('target_id', 7)); // Student role
                 });
         }
 
-        return ApiResponse::success($query->get());
+        $perPage = min($request->integer('per_page', 20), 100);
+        $paginated = $query->paginate($perPage);
+
+        return ApiResponse::success($paginated->items(), 'Announcements retrieved.', 200, [
+            'current_page' => $paginated->currentPage(),
+            'last_page' => $paginated->lastPage(),
+            'per_page' => $paginated->perPage(),
+            'total' => $paginated->total(),
+        ]);
     }
 
     public function store(Request $request): JsonResponse

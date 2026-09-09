@@ -6,13 +6,14 @@ use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
     public function run(): void
     {
         // Reset cached roles and permissions
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         $permissions = [
             // User Management
@@ -78,6 +79,15 @@ class RolesAndPermissionsSeeder extends Seeder
             ['name' => 'enrollments.create', 'group_name' => 'Enrollments', 'display_name' => 'Create Enrollments', 'description' => 'Can enroll students into batches'],
             ['name' => 'enrollments.update', 'group_name' => 'Enrollments', 'display_name' => 'Update Enrollments', 'description' => 'Can modify enrollment status and completions'],
             ['name' => 'enrollments.delete', 'group_name' => 'Enrollments', 'display_name' => 'Delete Enrollments', 'description' => 'Can cancel student enrollments'],
+            ['name' => 'enrollments.review', 'group_name' => 'Enrollments', 'display_name' => 'Review Enrollments', 'description' => 'Can approve enrollment admission at branch level'],
+            ['name' => 'enrollments.finance-clear', 'group_name' => 'Enrollments', 'display_name' => 'Clear Enrollment Finance', 'description' => 'Can confirm that enrollment fees are cleared'],
+            ['name' => 'enrollments.complete', 'group_name' => 'Enrollments', 'display_name' => 'Complete Enrollments', 'description' => 'Can approve academic course completion'],
+            ['name' => 'enrollments.certification-approve', 'group_name' => 'Enrollments', 'display_name' => 'Approve Certification Readiness', 'description' => 'Can approve eligible students for certification'],
+
+            // Finance
+            ['name' => 'finance.view', 'group_name' => 'Finance', 'display_name' => 'View Finance Records', 'description' => 'Can view fees, balances and payment history'],
+            ['name' => 'finance.create', 'group_name' => 'Finance', 'display_name' => 'Record Payments', 'description' => 'Can record confirmed student payments'],
+            ['name' => 'finance.update', 'group_name' => 'Finance', 'display_name' => 'Manage Finance Records', 'description' => 'Can manage fees and reconcile payments'],
 
             // Classes & Attendance
             ['name' => 'classes.view', 'group_name' => 'Classes & Attendance', 'display_name' => 'View Classes', 'description' => 'Can view class timetable'],
@@ -152,11 +162,12 @@ class RolesAndPermissionsSeeder extends Seeder
                     'staff.view',
                     'courses.view',
                     'batches.view',
-                    'enrollments.view',
+                    'enrollments.view', 'enrollments.review', 'enrollments.complete', 'enrollments.certification-approve',
+                    'finance.view',
                     'classes.view',
                     'attendance.view', 'attendance.view-all-branches',
                     'assessments.view',
-                    'certificates.view',
+                    'certificates.view', 'certificates.issue',
                     'reports.view', 'reports.export', 'reports.view-all-branches',
                     'settings.view',
                     'audit_logs.view',
@@ -177,6 +188,8 @@ class RolesAndPermissionsSeeder extends Seeder
                     'courses.view', 'courses.create', 'course-categories.manage', 'courses.update', 'modules.manage', 'lessons.manage',
                     'batches.view', 'batches.create', 'batches.update', 'batches.assign-trainers',
                     'enrollments.view', 'enrollments.create', 'enrollments.update',
+                    'enrollments.review', 'enrollments.finance-clear', 'enrollments.complete', 'enrollments.certification-approve',
+                    'finance.view', 'finance.create', 'finance.update',
                     'classes.view', 'classes.manage', 'attendance.view', 'attendance.create', 'attendance.update', 'attendance.view-all-branches',
                     'assessments.view', 'assessments.create', 'assessments.update', 'assessments.grade',
                     'certificates.view', 'certificates.create-template', 'certificates.issue',
@@ -196,10 +209,10 @@ class RolesAndPermissionsSeeder extends Seeder
                     'staff.view',
                     'courses.view',
                     'batches.view', 'batches.create', 'batches.update', 'batches.assign-trainers',
-                    'enrollments.view', 'enrollments.create', 'enrollments.update',
+                    'enrollments.view', 'enrollments.create', 'enrollments.update', 'enrollments.review',
                     'classes.view', 'classes.manage', 'attendance.view', 'attendance.create', 'attendance.update',
                     'assessments.view', 'assessments.grade',
-                    'certificates.view',
+                    'certificates.view', 'certificates.issue',
                     'reports.view', 'reports.export',
                 ],
             ],
@@ -211,7 +224,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'permissions' => [
                     'courses.view', 'courses.create', 'course-categories.manage', 'courses.update', 'modules.manage', 'lessons.manage',
                     'batches.view', 'batches.create', 'batches.update', 'batches.assign-trainers',
-                    'students.view', 'enrollments.view',
+                    'students.view', 'enrollments.view', 'enrollments.complete', 'enrollments.certification-approve',
                     'classes.view', 'attendance.view',
                     'assessments.view', 'assessments.create', 'assessments.update', 'assessments.grade',
                     'certificates.view', 'certificates.create-template', 'certificates.issue',
@@ -239,6 +252,36 @@ class RolesAndPermissionsSeeder extends Seeder
                     'students.view', 'students.create', 'students.update',
                     'courses.view', 'batches.view', 'enrollments.view', 'enrollments.create',
                     'classes.view',
+                ],
+            ],
+            [
+                'name' => 'Finance Officer',
+                'display_name' => 'Finance Officer / Accounts',
+                'description' => 'Records student payments, reconciles balances and clears enrollment finance',
+                'is_system_protected' => false,
+                'permissions' => [
+                    'students.view', 'enrollments.view', 'finance.view', 'finance.create', 'finance.update', 'enrollments.finance-clear',
+                    'reports.view', 'reports.export',
+                ],
+            ],
+            [
+                'name' => 'Admissions Officer',
+                'display_name' => 'Admissions Officer',
+                'description' => 'Owns student intake, document checks, branch review and cohort admission',
+                'is_system_protected' => false,
+                'permissions' => [
+                    'students.view', 'students.create', 'students.update', 'courses.view', 'batches.view',
+                    'enrollments.view', 'enrollments.create', 'enrollments.review',
+                ],
+            ],
+            [
+                'name' => 'Certification Officer',
+                'display_name' => 'Examinations & Certification Officer',
+                'description' => 'Verifies completion outcomes and approves students for certification',
+                'is_system_protected' => false,
+                'permissions' => [
+                    'students.view', 'enrollments.view', 'enrollments.complete', 'enrollments.certification-approve',
+                    'assessments.view', 'assessments.grade', 'certificates.view', 'certificates.issue', 'reports.view',
                 ],
             ],
             [

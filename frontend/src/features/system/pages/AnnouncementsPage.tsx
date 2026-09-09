@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../../../components/common/Card';
 import { Badge } from '../../../components/common/Badge';
 import { Modal } from '../../../components/common/Modal';
+import { Pagination } from '../../../components/common/Pagination';
 import { useAuth } from '../../../context/AuthContext';
 import api from '../../../api/client';
-import { Plus, Megaphone, Edit2, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, Megaphone, Edit2, Trash2, AlertTriangle, RotateCcw } from 'lucide-react';
 
 export const AnnouncementsPage: React.FC = () => {
   const { hasPermission } = useAuth();
@@ -14,6 +15,13 @@ export const AnnouncementsPage: React.FC = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<any>(null);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [targetType, setTargetType] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ current_page: 1, last_page: 1, total: 0 });
 
   const [formData, setFormData] = useState({
     title: '',
@@ -24,9 +32,10 @@ export const AnnouncementsPage: React.FC = () => {
   const fetchAnnouncements = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/announcements');
+      const res = await api.get('/announcements', { params: { search: search || undefined, status: status || undefined, target_type: targetType || undefined, from_date: fromDate || undefined, to_date: toDate || undefined, page, per_page: 20 } });
       if (res.data.success) {
         setAnnouncements(res.data.data);
+        if (res.data.meta) setPagination(res.data.meta);
       }
     } catch (err) {
       console.error(err);
@@ -37,7 +46,7 @@ export const AnnouncementsPage: React.FC = () => {
 
   useEffect(() => {
     fetchAnnouncements();
-  }, []);
+  }, [search, status, targetType, fromDate, toDate, page]);
 
   const handlePost = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,6 +122,15 @@ export const AnnouncementsPage: React.FC = () => {
       </div>
 
       <div className="space-y-4">
+        <Card className="p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
+            <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search title or message" className="sm:col-span-2 w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs" />
+            <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"><option value="">All statuses</option><option value="published">Published</option><option value="draft">Draft</option><option value="archived">Archived</option></select>
+            <select value={targetType} onChange={(e) => { setTargetType(e.target.value); setPage(1); }} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"><option value="">All audiences</option><option value="all">Everyone</option><option value="branch">Branch</option><option value="role">Role</option><option value="course">Course</option><option value="batch">Batch</option></select>
+            <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1); }} aria-label="From date" className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs" />
+            <div className="flex gap-2"><input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1); }} aria-label="To date" className="min-w-0 w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs" /><button onClick={() => { setSearch(''); setStatus(''); setTargetType(''); setFromDate(''); setToDate(''); setPage(1); }} title="Clear filters" className="p-2.5 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100"><RotateCcw className="h-4 w-4" /></button></div>
+          </div>
+        </Card>
         {loading ? (
           <div className="py-16 text-center text-xs text-slate-400">Loading broadcasts...</div>
         ) : (
@@ -156,6 +174,7 @@ export const AnnouncementsPage: React.FC = () => {
           ))
         )}
       </div>
+      <Pagination currentPage={pagination.current_page} lastPage={pagination.last_page} total={pagination.total} onPageChange={setPage} />
 
       {/* Create Modal */}
       <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} title="Post Announcement">

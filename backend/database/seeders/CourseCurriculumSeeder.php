@@ -6,11 +6,9 @@ use App\Models\Course;
 use App\Models\CourseCategory;
 use App\Models\CourseModule;
 use App\Models\Lesson;
-use App\Models\LessonResource;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
 
 class CourseCurriculumSeeder extends Seeder
 {
@@ -51,6 +49,107 @@ class CourseCurriculumSeeder extends Seeder
             'description' => 'Business intelligence, Power BI, SQL analytics, and visualization',
             'status' => 'active',
         ]);
+
+        $catAcca = CourseCategory::create([
+            'organization_id' => $org->id,
+            'name' => 'ACCA',
+            'slug' => 'acca',
+            'description' => 'ACCA foundation, applied knowledge, applied skills, and strategic professional pathways',
+            'status' => 'active',
+        ]);
+
+        $accaCourses = [
+            [
+                'code' => 'ACCA-FIA',
+                'name' => 'ACCA Foundations in Accountancy (FIA)',
+                'short_description' => 'Build a practical foundation in bookkeeping, financial transactions, management information, and cost accounting.',
+                'description' => 'The FIA pathway introduces the seven foundation papers highlighted by IAT, from recording transactions through financial and management accounting. It is suitable for learners beginning their accounting journey.',
+                'duration' => 24,
+                'duration_unit' => 'weeks',
+                'level' => 'Beginner',
+                'modules' => [
+                    ['title' => 'Foundation Level — Recording and Management Information', 'description' => 'Core bookkeeping and management information papers.', 'lessons' => ['FA1 — Recording Financial Transactions', 'MA1 — Management Information']],
+                    ['title' => 'Foundation Level — Financial Records and Cost Management', 'description' => 'Maintaining records and managing costs and finance.', 'lessons' => ['FA2 — Maintaining Financial Records', 'MA2 — Managing Costs and Finance']],
+                    ['title' => 'Fundamental Level — Accounting and Business Foundations', 'description' => 'The three papers that prepare learners for the ACCA Diploma in Accounting and Business.', 'lessons' => ['FBT — Business and Technology', 'FMA — Management Accounting', 'FFA — Financial Accounting']],
+                ],
+            ],
+            [
+                'code' => 'ACCA-APPLIED-KNOWLEDGE',
+                'name' => 'ACCA Applied Knowledge',
+                'short_description' => 'Develop essential technical, business, and accounting knowledge through three core ACCA papers.',
+                'description' => 'The Applied Knowledge module is the first step in the ACCA qualification after the foundation pathway. It develops the core knowledge required for practical finance and accounting roles.',
+                'duration' => 16,
+                'duration_unit' => 'weeks',
+                'level' => 'Intermediate',
+                'modules' => [
+                    ['title' => 'Applied Knowledge — Business and Technology', 'description' => 'How organisations operate effectively, responsibly, and ethically.', 'lessons' => ['BT — Business and Technology']],
+                    ['title' => 'Applied Knowledge — Management Accounting', 'description' => 'Planning, costing, budgeting, and decision-making with financial information.', 'lessons' => ['MA — Management Accounting']],
+                    ['title' => 'Applied Knowledge — Financial Accounting', 'description' => 'Recording transactions and preparing reliable financial statements.', 'lessons' => ['FA — Financial Accounting']],
+                ],
+            ],
+            [
+                'code' => 'ACCA-APPLIED-SKILLS',
+                'name' => 'ACCA Applied Skills',
+                'short_description' => 'Advance your accounting capability across law, performance, tax, reporting, audit, and financial management.',
+                'description' => 'The Applied Skills module builds practical finance skills for professional accounting work and prepares learners for advanced strategic study.',
+                'duration' => 28,
+                'duration_unit' => 'weeks',
+                'level' => 'Advanced',
+                'modules' => [
+                    ['title' => 'Applied Skills — Corporate and Business Law', 'description' => 'Legal frameworks governing business and finance.', 'lessons' => ['LW — Corporate and Business Law']],
+                    ['title' => 'Applied Skills — Performance and Taxation', 'description' => 'Performance management and taxation principles.', 'lessons' => ['PM — Performance Management', 'TX — Taxation']],
+                    ['title' => 'Applied Skills — Reporting and Assurance', 'description' => 'Financial reporting and audit and assurance practice.', 'lessons' => ['FR — Financial Reporting', 'AA — Audit and Assurance']],
+                    ['title' => 'Applied Skills — Financial Management', 'description' => 'Investment analysis, financing strategies, and dividend policies.', 'lessons' => ['FM — Financial Management']],
+                ],
+            ],
+            [
+                'code' => 'ACCA-STRATEGIC-PROFESSIONAL',
+                'name' => 'ACCA Strategic Professional',
+                'short_description' => 'Prepare for senior finance and business leadership through strategic reporting, leadership, and specialist options.',
+                'description' => 'The Strategic Professional module develops the technical expertise, ethical standards, and leadership skills required for senior finance and business roles. It contains two essentials papers and two option papers.',
+                'duration' => 20,
+                'duration_unit' => 'weeks',
+                'level' => 'Professional',
+                'modules' => [
+                    ['title' => 'Strategic Professional — Essentials', 'description' => 'Mandatory papers focused on leadership and strategic reporting.', 'lessons' => ['SBL — Strategic Business Leader', 'SBR — Strategic Business Reporting']],
+                    ['title' => 'Strategic Professional — Options', 'description' => 'Choose two specialist papers based on your career goals.', 'lessons' => ['AFM — Advanced Financial Management', 'APM — Advanced Performance Management', 'ATX — Advanced Taxation', 'AAA — Advanced Audit and Assurance']],
+                    ['title' => 'Strategic Professional — Ethics and Practical Experience', 'description' => 'Professional ethics, technical objectives, and the practical experience pathway.', 'lessons' => ['Ethics and Professional Skills Module', 'Practical Experience Requirement and Membership Pathway']],
+                ],
+            ],
+        ];
+
+        foreach ($accaCourses as $accaCourseData) {
+            $modules = $accaCourseData['modules'];
+            unset($accaCourseData['modules']);
+
+            $accaCourse = Course::create(array_merge($accaCourseData, [
+                'organization_id' => $org->id,
+                'category_id' => $catAcca->id,
+                'status' => 'active',
+                'created_by' => $trainer?->id,
+            ]));
+
+            foreach ($modules as $moduleIndex => $moduleData) {
+                $lessons = $moduleData['lessons'];
+                unset($moduleData['lessons']);
+                $accaModule = CourseModule::create(array_merge($moduleData, [
+                    'course_id' => $accaCourse->id,
+                    'order' => $moduleIndex + 1,
+                ]));
+
+                foreach ($lessons as $lessonIndex => $lessonTitle) {
+                    Lesson::create([
+                        'module_id' => $accaModule->id,
+                        'title' => $lessonTitle,
+                        'content_type' => 'text',
+                        'content' => "{$lessonTitle}\n\nStudy the official syllabus, practise exam-style questions, and review the learning objectives for this paper.",
+                        'duration' => 180,
+                        'order' => $lessonIndex + 1,
+                        'is_preview' => $lessonIndex === 0 && $moduleIndex === 0,
+                    ]);
+                }
+            }
+        }
 
         // 2. Course 1: CCNA Networking
         $courseCcna = Course::create([

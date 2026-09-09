@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\CourseUnitController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\DepartmentController;
 use App\Http\Controllers\Api\V1\EnrollmentController;
+use App\Http\Controllers\Api\V1\FinanceController;
 use App\Http\Controllers\Api\V1\GlobalSearchController;
 use App\Http\Controllers\Api\V1\GradebookController;
 use App\Http\Controllers\Api\V1\LessonController;
@@ -106,7 +107,13 @@ Route::prefix('v1')->group(function () {
         Route::get('batches/{batch}/gradebook', [GradebookController::class, 'show']);
         Route::apiResource('batches', CourseBatchController::class);
         Route::patch('enrollments/{enrollment}/status', [EnrollmentController::class, 'updateStatus']);
+        Route::patch('enrollments/{enrollment}/workflow', [EnrollmentController::class, 'advanceWorkflow']);
         Route::apiResource('enrollments', EnrollmentController::class);
+
+        // Fees, payments and finance clearance
+        Route::get('finance/enrollments', [FinanceController::class, 'index']);
+        Route::put('finance/enrollments/{enrollment}/fee', [FinanceController::class, 'setFee']);
+        Route::post('finance/payments', [FinanceController::class, 'recordPayment']);
 
         // Class Timetable & Attendance
         Route::get('class-sessions/{classSession}/attendance', [AttendanceController::class, 'getSessionRoster']);

@@ -14,6 +14,8 @@ import {
   Calendar,
   Clock,
   ArrowUpRight,
+  CheckCircle2,
+  Bell,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -31,6 +33,7 @@ export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -38,9 +41,12 @@ export const DashboardPage: React.FC = () => {
         const res = await api.get('/dashboard');
         if (res.data.success) {
           setData(res.data.data);
+        } else {
+          setError(res.data.message || 'Unable to load your dashboard.');
         }
       } catch (err) {
         console.error('Failed to load dashboard:', err);
+        setError('Unable to load your dashboard. Please try again or contact support.');
       } finally {
         setLoading(false);
       }
@@ -56,26 +62,76 @@ export const DashboardPage: React.FC = () => {
     );
   }
 
+  if (error || !data) {
+    return (
+      <div className="flex min-h-[420px] items-center justify-center px-4">
+        <div className="w-full max-w-md border border-slate-200 bg-white p-7 text-center shadow-sm">
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-amber-50 text-amber-700">!</div>
+          <h1 className="mt-4 text-base font-semibold text-slate-900">Dashboard unavailable</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-500">{error || 'Your dashboard could not be loaded.'}</p>
+          <button type="button" onClick={() => window.location.reload()} className="mt-5 border border-[#0f766e] px-4 py-2 text-xs font-bold text-[#0f766e] transition hover:bg-[#0f766e] hover:text-white">
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const isStudent = user?.roles?.includes('Student');
   const isTrainer = user?.roles?.includes('Trainer') && !user?.roles?.includes('Super Admin');
 
   // 1. STUDENT VIEW
   if (isStudent && data) {
     return (
-      <div className="space-y-6">
-        <div className="bg-gradient-to-r from-[#73111b] via-[#881337] to-[#9f1239] rounded-3xl p-6 sm:p-8 text-white shadow-lg shadow-[#73111b]/15">
-          <Badge variant="maroon">Student Portal</Badge>
-          <h1 className="text-xl sm:text-2xl font-bold mt-2">
-            Welcome back, {user?.first_name}! 🎓
-          </h1>
-          <p className="text-xs text-rose-100 mt-1 max-w-lg">
-            Student ID: <span className="font-bold underline">{data.student?.student_number}</span> • Track your course curriculum progress, upcoming class sessions, and practical assessments.
-          </p>
-        </div>
+      <div className="space-y-5">
+        <section className="relative overflow-hidden border border-slate-200 bg-white px-5 py-6 sm:px-8 sm:py-7 shadow-sm">
+          <div className="absolute inset-y-0 left-0 w-1 bg-[#0f766e]" />
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#0f766e]">Student workspace</p>
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+                Good to see you, {user?.first_name}.
+              </h1>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
+                Keep your learning on track, review your next milestone, and stay ready for your upcoming class.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-slate-100 pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Student ID</p>
+                <p className="mt-1 font-mono text-sm font-semibold text-slate-800">{data.student?.student_number}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Active enrolments</p>
+                <p className="mt-1 text-sm font-semibold text-slate-800">{data.workflow?.length || 0} programme{data.workflow?.length === 1 ? '' : 's'}</p>
+              </div>
+              <a href="/my-courses" className="inline-flex items-center gap-2 border border-[#0f766e] px-3.5 py-2 text-xs font-bold text-[#0f766e] transition hover:bg-[#0f766e] hover:text-white">
+                Open my courses <ArrowUpRight className="h-3.5 w-3.5" />
+              </a>
+            </div>
+          </div>
+        </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
+        {data.notifications?.length > 0 && (
+          <section className="border border-emerald-200 bg-emerald-50 px-5 py-4 shadow-sm sm:px-6">
+            <div className="flex items-start gap-3">
+              <Bell className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
+              <div className="min-w-0 space-y-2">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-800">Recent updates</p>
+                {data.notifications.map((notification: any) => (
+                  <div key={notification.id}>
+                    <p className="text-sm font-bold text-emerald-950">{notification.title}</p>
+                    <p className="text-xs leading-5 text-emerald-900">{notification.message}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-5">
+            <Card className="border-slate-200 shadow-sm">
               <CardHeader title="Course Learning Progress" subtitle="Derived from completed curriculum modules and lessons" />
               <div className="space-y-4">
                 {data.progress?.map((prog: any, idx: number) => (
@@ -99,7 +155,44 @@ export const DashboardPage: React.FC = () => {
               </div>
             </Card>
 
-            <Card>
+            <Card className="border-slate-200 shadow-sm">
+              <CardHeader title="Admission to Certification" subtitle="Your enrollment approvals and academic journey" />
+              <div className="space-y-3">
+                {data.workflow?.map((item: any, index: number) => {
+                  const stages = ['registered', 'branch_review', 'finance_cleared', 'in_training', 'course_completed', 'certification_ready', 'certified'];
+                  const labels: Record<string, string> = { registered: 'Registered', branch_review: 'Branch review', finance_cleared: 'Finance cleared', in_training: 'In training', course_completed: 'Course completed', certification_ready: 'Ready for certification', certified: 'Certified' };
+                  const current = stages.indexOf(item.stage);
+                  return (
+                    <div key={item.enrollment_number} className="rounded-xl border border-slate-200 p-3.5">
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <div><p className="text-xs font-bold text-slate-900">{item.course_name}</p><p className="text-[11px] text-slate-500">{item.enrollment_number}</p></div>
+                        <Badge variant={item.stage === 'certified' ? 'success' : 'primary'}>{labels[item.stage]}</Badge>
+                      </div>
+                      <div className="grid grid-cols-7 gap-1">
+                        {stages.map((stage, stageIndex) => (
+                          <div key={stage} title={labels[stage]} className={`h-2 rounded-full ${stageIndex <= current ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+                        ))}
+                      </div>
+                      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-500"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Next: {current < stages.length - 1 ? labels[stages[current + 1]] : 'Complete'}</div>
+                      {data.enrollments?.find((enrollment: any) => enrollment.enrollment_number === item.enrollment_number) && (() => {
+                        const enrollment = data.enrollments.find((candidate: any) => candidate.enrollment_number === item.enrollment_number);
+                        return (
+                          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 text-[11px]">
+                            <div><span className="block text-slate-400">Time remaining</span><strong className="text-slate-700">{enrollment.days_remaining === null ? 'No deadline set' : `${enrollment.days_remaining} days`}</strong></div>
+                            <div><span className="block text-slate-400">Next action</span><strong className="text-slate-700">{enrollment.next_action}</strong></div>
+                            <div><span className="block text-slate-400">Lessons remaining</span><strong className="text-slate-700">{enrollment.lessons_remaining}</strong></div>
+                            <div><span className="block text-slate-400">Course ends</span><strong className="text-slate-700">{enrollment.end_date || 'To be scheduled'}</strong></div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  );
+                })}
+                {(!data.workflow || data.workflow.length === 0) && <p className="py-4 text-center text-xs text-slate-400">No enrollment workflow is available yet.</p>}
+              </div>
+            </Card>
+
+            <Card className="border-slate-200 shadow-sm">
               <CardHeader title="Upcoming Class Timetable" subtitle="Live classes and physical lab sessions" />
               <div className="space-y-3">
                 {data.upcoming_classes?.length === 0 ? (
@@ -135,8 +228,8 @@ export const DashboardPage: React.FC = () => {
             </Card>
           </div>
 
-          <div className="space-y-6">
-            <Card>
+          <div className="space-y-5">
+            <Card className="border-slate-200 shadow-sm">
               <CardHeader title="Quizzes & CATs" subtitle="Upcoming assessments" />
               <div className="space-y-3">
                 {data.assessments?.map((ass: any, idx: number) => (
@@ -217,6 +310,18 @@ export const DashboardPage: React.FC = () => {
           <p className="text-[11px] text-emerald-600 font-bold mt-1">Attendance Rate: {data.metrics?.attendance_rate}%</p>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader title="Student Workflow Health" subtitle="Current position from registration through certification" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+          {[['registered', 'Registered'], ['branch_review', 'Branch review'], ['finance_cleared', 'Finance cleared'], ['in_training', 'In training'], ['course_completed', 'Completed'], ['certification_ready', 'Ready'], ['certified', 'Certified']].map(([stage, label]) => (
+            <div key={stage} className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
+              <p className="text-xl font-bold text-slate-900 mt-1">{data.workflow_summary?.[stage] || 0}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       {/* Analytics Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

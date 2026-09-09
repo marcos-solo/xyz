@@ -15,6 +15,7 @@ import { CoursesListPage } from '../features/courses/pages/CoursesListPage';
 import { CurriculumBuilderPage } from '../features/courses/pages/CurriculumBuilderPage';
 import { BatchesListPage } from '../features/batches/pages/BatchesListPage';
 import { EnrollmentsListPage } from '../features/enrollments/pages/EnrollmentsListPage';
+import { FinancePage } from '../features/finance/pages/FinancePage';
 import { ClassTimetablePage } from '../features/classes/pages/ClassTimetablePage';
 import { AssessmentsListPage } from '../features/assessments/pages/AssessmentsListPage';
 import { QuizRunnerPage } from '../features/assessments/pages/QuizRunnerPage';
@@ -79,6 +80,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="/batches" element={<BatchesListPage />} />
         <Route path="/batches/:batchUuid/gradebook" element={<GradebookPage />} />
         <Route path="/enrollments" element={<EnrollmentsListPage />} />
+        <Route path="/finance" element={<FinancePage />} />
 
         {/* Operations */}
         <Route path="/classes" element={<ClassTimetablePage />} />

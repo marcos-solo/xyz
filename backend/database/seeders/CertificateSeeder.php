@@ -11,7 +11,6 @@ use App\Models\CourseBatch;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
 
 class CertificateSeeder extends Seeder
 {
@@ -20,8 +19,8 @@ class CertificateSeeder extends Seeder
         $org = Organization::first();
         $course = Course::where('code', 'CCNA-200-301')->first();
         $batch = CourseBatch::where('code', 'CCNA-2026-JAN-NRB')->first();
-        $studentJane = User::where('email', 'student.jane@apexlms.test')->first();
-        $superAdmin = User::where('email', 'superadmin@apexlms.test')->first();
+        $studentJane = User::where('email', 'student.jane@iatlms.test')->first();
+        $superAdmin = User::where('email', 'superadmin@iatlms.test')->first();
 
         // 1. Certificate Template
         $template = CertificateTemplate::create([

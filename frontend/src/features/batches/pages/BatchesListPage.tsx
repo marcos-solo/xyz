@@ -8,6 +8,19 @@ import api from '../../../api/client';
 import { Plus, Calendar, Building, UserCheck, Edit2, Trash2, AlertTriangle } from 'lucide-react';
 import type { CourseBatch, Course, Branch } from '../../../types/models';
 
+const dateOnly = (value?: string): string => value ? value.slice(0, 10) : '';
+
+const formatBatchDate = (value?: string): string => {
+  const normalized = dateOnly(value);
+  if (!normalized) return 'Not scheduled';
+
+  return new Intl.DateTimeFormat('en-KE', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(`${normalized}T00:00:00`));
+};
+
 export const BatchesListPage: React.FC = () => {
   const { hasPermission } = useAuth();
   const [batches, setBatches] = useState<CourseBatch[]>([]);
@@ -82,8 +95,8 @@ export const BatchesListPage: React.FC = () => {
       branch_uuid: b.branch?.uuid || '',
       name: b.name,
       code: b.code,
-      start_date: b.start_date,
-      end_date: b.end_date,
+      start_date: dateOnly(b.start_date),
+      end_date: dateOnly(b.end_date),
       capacity: b.capacity || 25,
       status: b.status || 'ongoing',
     });
@@ -266,7 +279,7 @@ export const BatchesListPage: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                      <span>{b.start_date} to {b.end_date}</span>
+                      <span>{formatBatchDate(b.start_date)} to {formatBatchDate(b.end_date)}</span>
                     </span>
                   </div>
 

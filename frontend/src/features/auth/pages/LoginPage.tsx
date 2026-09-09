@@ -6,7 +6,7 @@ import api from '../../../api/client';
 import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('superadmin@apexlms.test');
+  const [email, setEmail] = useState('superadmin@iatlms.test');
   const [password, setPassword] = useState('Password123!');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -111,7 +111,7 @@ export const LoginPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => handleQuickLogin('ceo@apexlms.test')}
+                onClick={() => handleQuickLogin('ceo@iatlms.test')}
                 className="col-span-2 p-2.5 rounded-xl bg-[#fff1f2] hover:bg-[#ffe4e6] border border-[#fecdd3] text-left transition flex items-center justify-between"
               >
                 <div>
@@ -122,7 +122,7 @@ export const LoginPage: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => handleQuickLogin('superadmin@apexlms.test')}
+                onClick={() => handleQuickLogin('superadmin@iatlms.test')}
                 className="p-2.5 rounded-xl bg-slate-50 hover:bg-[#fff1f2] border border-slate-200 hover:border-[#fecdd3] text-left transition"
               >
                 <p className="text-[11px] font-bold text-[#73111b]">Super Admin</p>
@@ -130,7 +130,7 @@ export const LoginPage: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => handleQuickLogin('bm.embu@apexlms.test')}
+                onClick={() => handleQuickLogin('bm.embu@iatlms.test')}
                 className="p-2.5 rounded-xl bg-slate-50 hover:bg-[#fff1f2] border border-slate-200 hover:border-[#fecdd3] text-left transition"
               >
                 <p className="text-[11px] font-bold text-[#73111b]">Branch Manager</p>
@@ -138,7 +138,7 @@ export const LoginPage: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => handleQuickLogin('trainer.nairobi@apexlms.test')}
+                onClick={() => handleQuickLogin('trainer.nairobi@iatlms.test')}
                 className="p-2.5 rounded-xl bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 text-left transition"
               >
                 <p className="text-[11px] font-bold text-emerald-700">Lead Trainer</p>
@@ -146,7 +146,7 @@ export const LoginPage: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => handleQuickLogin('student.john@apexlms.test')}
+                onClick={() => handleQuickLogin('student.john@iatlms.test')}
                 className="p-2.5 rounded-xl bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-200 text-left transition"
               >
                 <p className="text-[11px] font-bold text-amber-700">Student (John)</p>

@@ -13,7 +13,6 @@ use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 class OrganizationSeeder extends Seeder
 {
@@ -56,7 +55,10 @@ class OrganizationSeeder extends Seeder
         $posAm = Position::create(['organization_id' => $org->id, 'name' => 'Academic Manager', 'description' => 'Curriculum and Training Supervision']);
         $posTrainer = Position::create(['organization_id' => $org->id, 'name' => 'Senior Trainer', 'description' => 'Instruction & Assessment']);
         $posAsstTrainer = Position::create(['organization_id' => $org->id, 'name' => 'Assistant Trainer', 'description' => 'Lab Assistance & Tutoring']);
-        $posFrontOffice = Position::create(['organization_id' => $org->id, 'name' => 'Admissions Officer', 'description' => 'Student Intake & Registration']);
+        $posFrontOffice = Position::create(['organization_id' => $org->id, 'name' => 'Front Office Admissions', 'description' => 'Student Intake & Registration']);
+        $posFinance = Position::create(['organization_id' => $org->id, 'name' => 'Finance Officer', 'description' => 'Fees, Receipting & Reconciliation']);
+        $posAdmissions = Position::create(['organization_id' => $org->id, 'name' => 'Admissions Officer', 'description' => 'Admissions Review & Enrollment Approval']);
+        $posCertification = Position::create(['organization_id' => $org->id, 'name' => 'Certification Officer', 'description' => 'Examinations & Certification Readiness']);
 
         // 3. Create Branches
         $branchNrb = Branch::create([
@@ -112,7 +114,7 @@ class OrganizationSeeder extends Seeder
             'first_name' => 'Super',
             'middle_name' => 'System',
             'last_name' => 'Administrator',
-            'email' => 'superadmin@apexlms.test',
+            'email' => 'superadmin@iatlms.test',
             'phone' => '+254 700 000001',
             'password' => $defaultPassword,
             'organization_id' => $org->id,
@@ -140,7 +142,7 @@ class OrganizationSeeder extends Seeder
             'first_name' => 'Dr. Catherine',
             'middle_name' => 'Wanjiku',
             'last_name' => 'Mutua',
-            'email' => 'ceo@apexlms.test',
+            'email' => 'ceo@iatlms.test',
             'phone' => '+254 700 000000',
             'password' => $defaultPassword,
             'organization_id' => $org->id,
@@ -169,7 +171,7 @@ class OrganizationSeeder extends Seeder
             'first_name' => 'Marcus',
             'middle_name' => 'Kamau',
             'last_name' => 'Njoroge',
-            'email' => 'bm.nairobi@apexlms.test',
+            'email' => 'bm.nairobi@iatlms.test',
             'phone' => '+254 722 100001',
             'password' => $defaultPassword,
             'organization_id' => $org->id,
@@ -195,7 +197,7 @@ class OrganizationSeeder extends Seeder
             'first_name' => 'John',
             'middle_name' => 'Kariuki',
             'last_name' => 'Mwangi',
-            'email' => 'bm.embu@apexlms.test',
+            'email' => 'bm.embu@iatlms.test',
             'phone' => '+254 722 200001',
             'password' => $defaultPassword,
             'organization_id' => $org->id,
@@ -221,7 +223,7 @@ class OrganizationSeeder extends Seeder
             'first_name' => 'Dr. Catherine',
             'middle_name' => 'Wanjiku',
             'last_name' => 'Mutua',
-            'email' => 'academic.manager@apexlms.test',
+            'email' => 'academic.manager@iatlms.test',
             'phone' => '+254 722 300001',
             'password' => $defaultPassword,
             'organization_id' => $org->id,
@@ -247,7 +249,7 @@ class OrganizationSeeder extends Seeder
             'first_name' => 'David',
             'middle_name' => 'Otieno',
             'last_name' => 'Ochieng',
-            'email' => 'trainer.nairobi@apexlms.test',
+            'email' => 'trainer.nairobi@iatlms.test',
             'phone' => '+254 723 111001',
             'password' => $defaultPassword,
             'organization_id' => $org->id,
@@ -273,7 +275,7 @@ class OrganizationSeeder extends Seeder
             'first_name' => 'Faith',
             'middle_name' => 'Muthoni',
             'last_name' => 'Kiprono',
-            'email' => 'trainer.embu@apexlms.test',
+            'email' => 'trainer.embu@iatlms.test',
             'phone' => '+254 723 222001',
             'password' => $defaultPassword,
             'organization_id' => $org->id,
@@ -299,7 +301,7 @@ class OrganizationSeeder extends Seeder
             'first_name' => 'Samuel',
             'middle_name' => 'Kipchumba',
             'last_name' => 'Korir',
-            'email' => 'asst.trainer@apexlms.test',
+            'email' => 'asst.trainer@iatlms.test',
             'phone' => '+254 723 333001',
             'password' => $defaultPassword,
             'organization_id' => $org->id,
@@ -324,7 +326,7 @@ class OrganizationSeeder extends Seeder
             'first_name' => 'Grace',
             'middle_name' => 'Akinyi',
             'last_name' => 'Odhiambo',
-            'email' => 'frontoffice@apexlms.test',
+            'email' => 'frontoffice@iatlms.test',
             'phone' => '+254 724 000111',
             'password' => $defaultPassword,
             'organization_id' => $org->id,
@@ -344,7 +346,55 @@ class OrganizationSeeder extends Seeder
             'status' => 'active',
         ]);
 
-        // 10. Sample Guardians
+        // 10. Operational workflow specialists
+        $workflowStaff = [
+            [
+                'first_name' => 'Peter', 'middle_name' => 'K.', 'last_name' => 'Omondi',
+                'email' => 'finance@iatlms.test', 'phone' => '+254 724 000222',
+                'position_id' => $posFinance->id, 'role' => 'Finance Officer',
+                'employee_number' => 'EMP-0301', 'job_title' => 'Finance & Accounts Officer',
+            ],
+            [
+                'first_name' => 'Lydia', 'middle_name' => 'N.', 'last_name' => 'Wambui',
+                'email' => 'admissions@iatlms.test', 'phone' => '+254 724 000333',
+                'position_id' => $posAdmissions->id, 'role' => 'Admissions Officer',
+                'employee_number' => 'EMP-0302', 'job_title' => 'Admissions Review Officer',
+            ],
+            [
+                'first_name' => 'Michael', 'middle_name' => 'T.', 'last_name' => 'Kiptoo',
+                'email' => 'certification@iatlms.test', 'phone' => '+254 724 000444',
+                'position_id' => $posCertification->id, 'role' => 'Certification Officer',
+                'employee_number' => 'EMP-0303', 'job_title' => 'Examinations & Certification Officer',
+            ],
+        ];
+
+        foreach ($workflowStaff as $staff) {
+            $workflowUser = User::create([
+                'first_name' => $staff['first_name'],
+                'middle_name' => $staff['middle_name'],
+                'last_name' => $staff['last_name'],
+                'email' => $staff['email'],
+                'phone' => $staff['phone'],
+                'password' => $defaultPassword,
+                'organization_id' => $org->id,
+                'branch_id' => $branchNrb->id,
+                'department_id' => $deptBaNrb->id,
+                'position_id' => $staff['position_id'],
+                'status' => 'active',
+                'email_verified_at' => now(),
+            ]);
+            $workflowUser->assignRole($staff['role']);
+            StaffProfile::create([
+                'user_id' => $workflowUser->id,
+                'employee_number' => $staff['employee_number'],
+                'employment_date' => '2026-01-05',
+                'employment_type' => 'full_time',
+                'job_title' => $staff['job_title'],
+                'status' => 'active',
+            ]);
+        }
+
+        // 11. Sample Guardians
         $guardianA = Guardian::create([
             'organization_id' => $org->id,
             'first_name' => 'Joseph',
@@ -371,7 +421,7 @@ class OrganizationSeeder extends Seeder
                 'first_name' => 'John',
                 'middle_name' => 'K.',
                 'last_name' => 'Mwangi',
-                'email' => 'student.john@apexlms.test',
+                'email' => 'student.john@iatlms.test',
                 'phone' => '+254 712 111222',
                 'student_number' => 'SOFS-2026-0001',
                 'branch_id' => $branchNrb->id,
@@ -384,7 +434,7 @@ class OrganizationSeeder extends Seeder
                 'first_name' => 'Jane',
                 'middle_name' => 'Akinyi',
                 'last_name' => 'Oduor',
-                'email' => 'student.jane@apexlms.test',
+                'email' => 'student.jane@iatlms.test',
                 'phone' => '+254 712 333444',
                 'student_number' => 'SOFS-2026-0002',
                 'branch_id' => $branchNrb->id,
@@ -397,7 +447,7 @@ class OrganizationSeeder extends Seeder
                 'first_name' => 'Alex',
                 'middle_name' => 'Mutua',
                 'last_name' => 'Kioko',
-                'email' => 'student.alex@apexlms.test',
+                'email' => 'student.alex@iatlms.test',
                 'phone' => '+254 712 555666',
                 'student_number' => 'SOFS-2026-0003',
                 'branch_id' => $branchEmbu->id,
@@ -410,7 +460,7 @@ class OrganizationSeeder extends Seeder
                 'first_name' => 'Brian',
                 'middle_name' => 'Kipkemboi',
                 'last_name' => 'Ruto',
-                'email' => 'student.brian@apexlms.test',
+                'email' => 'student.brian@iatlms.test',
                 'phone' => '+254 712 777888',
                 'student_number' => 'SOFS-2026-0004',
                 'branch_id' => $branchEmbu->id,
@@ -423,7 +473,7 @@ class OrganizationSeeder extends Seeder
                 'first_name' => 'Diana',
                 'middle_name' => 'Chebet',
                 'last_name' => 'Koech',
-                'email' => 'student.diana@apexlms.test',
+                'email' => 'student.diana@iatlms.test',
                 'phone' => '+254 712 999000',
                 'student_number' => 'SOFS-2026-0005',
                 'branch_id' => $branchMeru->id,
@@ -455,7 +505,7 @@ class OrganizationSeeder extends Seeder
                 'admission_date' => '2026-01-05',
                 'date_of_birth' => $st['dob'],
                 'gender' => $st['gender'],
-                'national_id' => 'STU-NAT-' . rand(10000000, 99999999),
+                'national_id' => 'STU-NAT-'.rand(10000000, 99999999),
                 'emergency_contact_name' => 'Primary Guardian',
                 'emergency_contact_phone' => '+254 720 000999',
                 'status' => 'active',

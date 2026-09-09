@@ -7,6 +7,7 @@ use App\Http\Responses\ApiResponse;
 use App\Models\Certificate;
 use App\Models\CertificateTemplate;
 use App\Models\CourseBatch;
+use App\Models\Enrollment;
 use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\CertificateGenerationService;
@@ -54,7 +55,6 @@ class CertificateController extends Controller
         $student = User::where('uuid', $validated['student_uuid'])->firstOrFail();
         $batch = CourseBatch::where('uuid', $validated['batch_uuid'])->firstOrFail();
         $template = CertificateTemplate::where('uuid', $validated['template_uuid'])->firstOrFail();
-
         $eligibility = CertificateGenerationService::checkEligibility($student, $batch, $template);
 
         return ApiResponse::success($eligibility);
@@ -66,7 +66,7 @@ class CertificateController extends Controller
     public function issue(Request $request): JsonResponse
     {
         $authUser = $request->user();
-        if (!$authUser->can('certificates.issue')) {
+        if (! $authUser->can('certificates.issue')) {
             return ApiResponse::forbidden();
         }
 
@@ -80,6 +80,13 @@ class CertificateController extends Controller
         $student = User::where('uuid', $validated['student_uuid'])->firstOrFail();
         $batch = CourseBatch::where('uuid', $validated['batch_uuid'])->firstOrFail();
         $template = CertificateTemplate::where('uuid', $validated['template_uuid'])->firstOrFail();
+        $enrollment = Enrollment::where('student_id', $student->id)
+            ->where('batch_id', $batch->id)
+            ->first();
+
+        if (! $enrollment || $enrollment->workflow_stage !== 'certification_ready') {
+            return ApiResponse::error('The enrollment must be approved through certification readiness before a certificate can be issued.', 422);
+        }
 
         try {
             $cert = CertificateGenerationService::issue(
@@ -93,6 +100,12 @@ class CertificateController extends Controller
             AuditLogService::log('certificate.issue', $cert, null, [
                 'student' => $student->full_name,
                 'cert_number' => $cert->certificate_number,
+            ]);
+
+            $enrollment->update([
+                'workflow_stage' => 'certified',
+                'workflow_updated_by' => $authUser->id,
+                'workflow_updated_at' => now(),
             ]);
 
             return ApiResponse::success(
@@ -111,7 +124,7 @@ class CertificateController extends Controller
     public function revoke(Request $request, Certificate $certificate): JsonResponse
     {
         $authUser = $request->user();
-        if (!$authUser->can('certificates.revoke')) {
+        if (! $authUser->can('certificates.revoke')) {
             return ApiResponse::forbidden();
         }
 

@@ -127,6 +127,11 @@ class User extends Authenticatable
         return $this->hasMany(Certificate::class, 'student_id');
     }
 
+    public function recordedPayments(): HasMany
+    {
+        return $this->hasMany(FinancePayment::class, 'recorded_by');
+    }
+
     public function auditLogs(): HasMany
     {
         return $this->hasMany(AuditLog::class, 'user_id');

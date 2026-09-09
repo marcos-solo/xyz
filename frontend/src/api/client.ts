@@ -9,7 +9,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('iat_token') || localStorage.getItem('apex_token');
+  const token = localStorage.getItem('iat_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -22,8 +22,6 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('iat_token');
       localStorage.removeItem('iat_user');
-      localStorage.removeItem('apex_token');
-      localStorage.removeItem('apex_user');
       if (window.location.pathname !== '/login' && !window.location.pathname.startsWith('/verify')) {
         window.location.href = '/login';
       }

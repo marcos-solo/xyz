@@ -14,6 +14,7 @@ import {
   CalendarDays,
   FileCheck2,
   Award,
+  WalletCards,
   BarChart3,
   Bell,
   History,
@@ -82,6 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
               { name: 'Courses & Curriculum', path: '/courses', icon: BookMarked, show: hasPermission('courses.view') },
               { name: 'Batches / Cohorts', path: '/batches', icon: FolderKanban, show: hasPermission('batches.view') },
               { name: 'Enrollments', path: '/enrollments', icon: GraduationCap, show: hasPermission('enrollments.view') },
+              { name: 'Finance & Clearance', path: '/finance', icon: WalletCards, show: hasPermission('finance.view') },
             ],
           },
           {

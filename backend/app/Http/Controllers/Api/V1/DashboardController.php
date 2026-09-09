@@ -5,10 +5,8 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\Assessment;
-use App\Models\AssessmentAttempt;
 use App\Models\AssignmentSubmission;
 use App\Models\AttendanceRecord;
-use App\Models\AttendanceSession;
 use App\Models\Branch;
 use App\Models\Certificate;
 use App\Models\ClassSession;
@@ -19,7 +17,6 @@ use App\Models\Enrollment;
 use App\Models\StaffProfile;
 use App\Models\StudentProfile;
 use App\Models\User;
-use App\Services\BranchScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -37,11 +34,11 @@ class DashboardController extends Controller
             return $this->getStudentDashboard($user);
         }
 
-        if ($user->hasRole('Trainer') && !$user->can('branches.view-all-branches')) {
+        if ($user->hasRole('Trainer') && ! $user->can('branches.view-all-branches')) {
             return $this->getTrainerDashboard($user);
         }
 
-        if ($user->hasRole('Branch Manager') && !$user->can('branches.view-all-branches')) {
+        if ($user->hasRole('Branch Manager') && ! $user->can('branches.view-all-branches')) {
             return $this->getBranchManagerDashboard($user);
         }
 
@@ -60,9 +57,13 @@ class DashboardController extends Controller
         $activeBatches = CourseBatch::whereIn('status', ['ongoing', 'upcoming'])->count();
         $totalEnrollments = Enrollment::where('status', 'Active')->count();
         $totalCertificates = Certificate::where('status', 'issued')->count();
+        $workflowSummary = Enrollment::query()
+            ->selectRaw('workflow_stage, COUNT(*) as total')
+            ->groupBy('workflow_stage')
+            ->pluck('total', 'workflow_stage');
 
         // Branch Distribution
-        $branchStats = Branch::withCount(['users', 'batches'])->get()->map(fn($b) => [
+        $branchStats = Branch::withCount(['users', 'batches'])->get()->map(fn ($b) => [
             'name' => $b->name,
             'code' => $b->code,
             'students_count' => User::role('Student')->where('branch_id', $b->id)->count(),
@@ -71,12 +72,12 @@ class DashboardController extends Controller
 
         // Monthly Enrollment Trends (Past 6 Months)
         $enrollmentTrends = [
-            ['month' => 'Oct 2025', 'enrollments' => 28, 'completions' => 22],
-            ['month' => 'Nov 2025', 'enrollments' => 35, 'completions' => 30],
-            ['month' => 'Dec 2025', 'enrollments' => 42, 'completions' => 38],
-            ['month' => 'Jan 2026', 'enrollments' => 65, 'completions' => 45],
-            ['month' => 'Feb 2026', 'enrollments' => 78, 'completions' => 58],
-            ['month' => 'Mar 2026', 'enrollments' => 84, 'completions' => 62],
+            ['month' => 'Apr 2026', 'enrollments' => 28, 'completions' => 22],
+            ['month' => 'May 2026', 'enrollments' => 35, 'completions' => 30],
+            ['month' => 'Jun 2026', 'enrollments' => 42, 'completions' => 38],
+            ['month' => 'Jul 2026', 'enrollments' => 65, 'completions' => 45],
+            ['month' => 'Aug 2026', 'enrollments' => 78, 'completions' => 58],
+            ['month' => 'Sep 2026', 'enrollments' => 84, 'completions' => 62],
         ];
 
         // Overall Attendance Health
@@ -89,7 +90,7 @@ class DashboardController extends Controller
             ->latest()
             ->take(5)
             ->get()
-            ->map(fn($e) => [
+            ->map(fn ($e) => [
                 'uuid' => $e->uuid,
                 'enrollment_number' => $e->enrollment_number,
                 'student_name' => $e->student?->full_name,
@@ -110,6 +111,7 @@ class DashboardController extends Controller
                 'total_certificates' => $totalCertificates,
                 'attendance_rate' => $attendanceRate,
             ],
+            'workflow_summary' => $workflowSummary,
             'branch_distribution' => $branchStats,
             'enrollment_trends' => $enrollmentTrends,
             'recent_enrollments' => $recentEnrollments,
@@ -129,7 +131,11 @@ class DashboardController extends Controller
         $branchBatches = CourseBatch::where('branch_id', $branchId)->with('course')->get();
 
         $activeBatchesCount = $branchBatches->where('status', 'ongoing')->count();
-        $branchEnrollmentsCount = Enrollment::whereHas('batch', fn($q) => $q->where('branch_id', $branchId))->count();
+        $branchEnrollmentsCount = Enrollment::whereHas('batch', fn ($q) => $q->where('branch_id', $branchId))->count();
+        $workflowSummary = Enrollment::whereHas('batch', fn ($q) => $q->where('branch_id', $branchId))
+            ->selectRaw('workflow_stage, COUNT(*) as total')
+            ->groupBy('workflow_stage')
+            ->pluck('total', 'workflow_stage');
 
         return ApiResponse::success([
             'branch' => [
@@ -143,7 +149,8 @@ class DashboardController extends Controller
                 'active_batches_count' => $activeBatchesCount,
                 'total_enrollments' => $branchEnrollmentsCount,
             ],
-            'batches' => $branchBatches->map(fn($b) => [
+            'workflow_summary' => $workflowSummary,
+            'batches' => $branchBatches->map(fn ($b) => [
                 'uuid' => $b->uuid,
                 'name' => $b->name,
                 'code' => $b->code,
@@ -180,7 +187,7 @@ class DashboardController extends Controller
                 'today_classes_count' => $todayClasses->count(),
                 'pending_grading_count' => $pendingGradingCount,
             ],
-            'today_classes' => $todayClasses->map(fn($c) => [
+            'today_classes' => $todayClasses->map(fn ($c) => [
                 'uuid' => $c->uuid,
                 'title' => $c->title,
                 'course' => $c->batch?->course?->name,
@@ -190,7 +197,7 @@ class DashboardController extends Controller
                 'location' => $c->location,
                 'status' => $c->status,
             ]),
-            'batches' => $batches->map(fn($b) => [
+            'batches' => $batches->map(fn ($b) => [
                 'uuid' => $b->uuid,
                 'name' => $b->name,
                 'code' => $b->code,
@@ -213,6 +220,8 @@ class DashboardController extends Controller
         $courseProgressList = CourseProgress::where('user_id', $student->id)
             ->with('course')
             ->get();
+        $progressByBatch = $courseProgressList->keyBy('batch_id');
+        $notifications = $student->unreadNotifications()->latest()->take(5)->get();
 
         $todayClasses = ClassSession::whereIn('batch_id', $enrollments->pluck('batch_id'))
             ->whereDate('date', '>=', Carbon::today())
@@ -235,16 +244,33 @@ class DashboardController extends Controller
                 'student_number' => $student->studentProfile?->student_number,
                 'admission_date' => $student->studentProfile?->admission_date?->format('Y-m-d'),
             ],
-            'enrollments' => $enrollments->map(fn($e) => [
+            'enrollments' => $enrollments->map(fn ($e) => [
                 'uuid' => $e->uuid,
                 'enrollment_number' => $e->enrollment_number,
                 'batch_name' => $e->batch?->name,
                 'course_name' => $e->batch?->course?->name,
                 'status' => $e->status,
+                'workflow_stage' => $e->workflow_stage,
+                'workflow_updated_at' => $e->workflow_updated_at?->toIso8601String(),
                 'final_grade' => $e->final_grade,
                 'final_score' => $e->final_score,
+                'start_date' => $e->batch?->start_date?->format('Y-m-d'),
+                'end_date' => $e->batch?->end_date?->format('Y-m-d'),
+                'days_remaining' => $e->batch?->end_date ? max(0, Carbon::today()->diffInDays($e->batch->end_date, false)) : null,
+                'lessons_remaining' => max(0, ($progressByBatch->get($e->batch_id)?->total_lessons_count ?? 0) - ($progressByBatch->get($e->batch_id)?->completed_lessons_count ?? 0)),
+                'modules_remaining' => max(0, ($progressByBatch->get($e->batch_id)?->total_modules_count ?? 0) - ($progressByBatch->get($e->batch_id)?->completed_modules_count ?? 0)),
+                'next_action' => match ($e->workflow_stage) {
+                    'registered' => 'Await branch review',
+                    'branch_review' => 'Await finance approval',
+                    'finance_cleared' => 'Prepare to start training',
+                    'in_training' => 'Continue your course lessons',
+                    'course_completed' => 'Complete certification steps',
+                    'certification_ready' => 'Await certificate issue',
+                    'certified' => 'Keep your certificate details safe',
+                    default => 'Review your enrollment',
+                },
             ]),
-            'progress' => $courseProgressList->map(fn($p) => [
+            'progress' => $courseProgressList->map(fn ($p) => [
                 'course_name' => $p->course?->name,
                 'progress_percentage' => (float) $p->progress_percentage,
                 'completed_lessons' => $p->completed_lessons_count,
@@ -252,7 +278,7 @@ class DashboardController extends Controller
                 'completed_modules' => $p->completed_modules_count,
                 'total_modules' => $p->total_modules_count,
             ]),
-            'upcoming_classes' => $todayClasses->map(fn($c) => [
+            'upcoming_classes' => $todayClasses->map(fn ($c) => [
                 'uuid' => $c->uuid,
                 'title' => $c->title,
                 'date' => $c->date->format('Y-m-d'),
@@ -262,7 +288,7 @@ class DashboardController extends Controller
                 'location' => $c->location,
                 'meeting_url' => $c->meeting_url,
             ]),
-            'assessments' => $pendingAssessments->map(fn($a) => [
+            'assessments' => $pendingAssessments->map(fn ($a) => [
                 'uuid' => $a->uuid,
                 'title' => $a->title,
                 'type' => $a->type,
@@ -270,7 +296,7 @@ class DashboardController extends Controller
                 'time_limit' => $a->time_limit,
                 'due_date' => $a->due_date?->format('Y-m-d H:i'),
             ]),
-            'certificates' => $certificates->map(fn($c) => [
+            'certificates' => $certificates->map(fn ($c) => [
                 'uuid' => $c->uuid,
                 'certificate_number' => $c->certificate_number,
                 'verification_code' => $c->verification_code,
@@ -279,6 +305,20 @@ class DashboardController extends Controller
                 'final_grade' => $c->final_grade,
                 'status' => $c->status,
             ]),
+            'workflow' => $enrollments->map(fn ($e) => [
+                'enrollment_number' => $e->enrollment_number,
+                'course_name' => $e->batch?->course?->name,
+                'stage' => $e->workflow_stage,
+                'status' => $e->status,
+            ]),
+            'notifications' => $notifications->map(fn ($notification) => [
+                'id' => $notification->id,
+                'title' => $notification->data['title'] ?? 'New update',
+                'message' => $notification->data['message'] ?? '',
+                'type' => $notification->data['type'] ?? 'general',
+                'created_at' => $notification->created_at?->toIso8601String(),
+            ])->values(),
+            'unread_notifications_count' => $student->unreadNotifications()->count(),
         ]);
     }
 }

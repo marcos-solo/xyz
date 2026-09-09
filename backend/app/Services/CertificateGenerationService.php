@@ -14,9 +14,7 @@ use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class CertificateGenerationService
@@ -46,8 +44,8 @@ class CertificateGenerationService
             $attendedCount = AttendanceRecord::whereHas('session', function ($q) use ($batch) {
                 $q->where('batch_id', $batch->id);
             })->where('student_id', $student->id)
-              ->whereIn('status', ['Present', 'Late'])
-              ->count();
+                ->whereIn('status', ['Present', 'Late'])
+                ->count();
             $attendancePct = ($attendedCount / $totalSessions) * 100;
         } else {
             $attendancePct = 100; // No recorded sessions yet
@@ -89,15 +87,15 @@ class CertificateGenerationService
     ): Certificate {
         $eligibility = self::checkEligibility($student, $batch, $template);
 
-        if (!$eligibility['eligible'] && !$force) {
-            throw new \Exception('Student does not satisfy the certificate requirements: Progress ' . $eligibility['progress_percentage'] . '%, Attendance ' . $eligibility['attendance_percentage'] . '%');
+        if (! $eligibility['eligible'] && ! $force) {
+            throw new \Exception('Student does not satisfy the certificate requirements: Progress '.$eligibility['progress_percentage'].'%, Attendance '.$eligibility['attendance_percentage'].'%');
         }
 
         // Generate unique numbers
         $year = Carbon::now()->format('Y');
         $certCount = Certificate::whereYear('created_at', $year)->count() + 1;
-        $certNumber = sprintf('SOFS-CERT-%s-%05d', $year, $certCount);
-        $verificationCode = sprintf('APX-%s-%s', strtoupper($batch->course->code ?? 'CERT'), strtoupper(Str::random(6)));
+        $certNumber = sprintf('IAT-CERT-%s-%05d', $year, $certCount);
+        $verificationCode = sprintf('IAT-%s-%s', strtoupper($batch->course->code ?? 'CERT'), strtoupper(Str::random(6)));
 
         $certificate = Certificate::create([
             'organization_id' => $batch->organization_id,
@@ -124,9 +122,10 @@ class CertificateGenerationService
     {
         $renderer = new ImageRenderer(
             new RendererStyle(150),
-            new SvgImageBackEnd()
+            new SvgImageBackEnd
         );
         $writer = new Writer($renderer);
+
         return $writer->writeString($verificationUrl);
     }
 }

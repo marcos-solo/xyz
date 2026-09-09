@@ -17,11 +17,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('iat_user') || localStorage.getItem('apex_user');
+    const saved = localStorage.getItem('iat_user');
     return saved ? JSON.parse(saved) : null;
   });
   const [token, setToken] = useState<string | null>(
-    () => localStorage.getItem('iat_token') || localStorage.getItem('apex_token')
+    () => localStorage.getItem('iat_token')
   );
   const [loading, setLoading] = useState(true);
 
@@ -37,8 +37,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch {
           localStorage.removeItem('iat_token');
           localStorage.removeItem('iat_user');
-          localStorage.removeItem('apex_token');
-          localStorage.removeItem('apex_user');
           setToken(null);
           setUser(null);
         }
@@ -66,8 +64,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       localStorage.removeItem('iat_token');
       localStorage.removeItem('iat_user');
-      localStorage.removeItem('apex_token');
-      localStorage.removeItem('apex_user');
       setToken(null);
       setUser(null);
     }

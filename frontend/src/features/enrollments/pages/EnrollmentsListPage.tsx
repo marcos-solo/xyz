@@ -5,7 +5,7 @@ import { Modal } from '../../../components/common/Modal';
 import { Pagination } from '../../../components/common/Pagination';
 import { useAuth } from '../../../context/AuthContext';
 import api from '../../../api/client';
-import { Plus, RotateCcw } from 'lucide-react';
+import { Plus, RotateCcw, ArrowRight } from 'lucide-react';
 import type { Enrollment, CourseBatch, StudentProfile } from '../../../types/models';
 
 export const EnrollmentsListPage: React.FC = () => {
@@ -63,6 +63,36 @@ export const EnrollmentsListPage: React.FC = () => {
     }
   };
 
+  const workflowLabels: Record<string, string> = {
+    registered: 'Registered',
+    branch_review: 'Branch review',
+    finance_cleared: 'Finance cleared',
+    in_training: 'In training',
+    course_completed: 'Course completed',
+    certification_ready: 'Ready for certification',
+    certified: 'Certified',
+  };
+
+  const advanceWorkflow = async (enrollment: Enrollment) => {
+    const stages = Object.keys(workflowLabels);
+    const nextStage = stages[stages.indexOf(enrollment.workflow_stage) + 1];
+    if (!nextStage) return;
+    const requiredPermission: Record<string, string> = {
+      branch_review: 'enrollments.review',
+      finance_cleared: 'enrollments.finance-clear',
+      in_training: 'enrollments.update',
+      course_completed: 'enrollments.complete',
+      certification_ready: 'enrollments.certification-approve',
+    };
+    if (!hasPermission(requiredPermission[nextStage] || 'enrollments.update')) return;
+    try {
+      await api.patch(`/enrollments/${enrollment.uuid}/workflow`, { stage: nextStage });
+      fetchEnrollments();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Unable to advance this enrollment.');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -102,12 +132,13 @@ export const EnrollmentsListPage: React.FC = () => {
                 <th className="py-3.5 px-4">Cohort Batch</th>
                 <th className="py-3.5 px-4">Campus</th>
                 <th className="py-3.5 px-4">Date</th>
-                <th className="py-3.5 px-4">Status</th>
+                <th className="py-3.5 px-4">Workflow</th>
+                <th className="py-3.5 px-4">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {loading ? (
-                <tr><td colSpan={6} className="py-10 text-center text-slate-400">Loading enrollments...</td></tr>
+                <tr><td colSpan={7} className="py-10 text-center text-slate-400">Loading enrollments...</td></tr>
               ) : (
                 enrollments.map((enr) => (
                   <tr key={enr.uuid} className="hover:bg-slate-50/70 transition">
@@ -117,7 +148,14 @@ export const EnrollmentsListPage: React.FC = () => {
                     <td className="py-3 px-4 text-slate-600">{enr.batch?.branch?.name || 'Main Campus'}</td>
                     <td className="py-3 px-4 text-slate-500">{enr.enrollment_date}</td>
                     <td className="py-3 px-4">
-                      <Badge variant={enr.status === 'Active' ? 'success' : 'primary'}>{enr.status}</Badge>
+                      <Badge variant={enr.workflow_stage === 'certified' ? 'success' : 'primary'}>{workflowLabels[enr.workflow_stage] || enr.status}</Badge>
+                    </td>
+                    <td className="py-3 px-4">
+                      {enr.workflow_stage !== 'certified' && hasPermission(({ branch_review: 'enrollments.review', finance_cleared: 'enrollments.finance-clear', in_training: 'enrollments.update', course_completed: 'enrollments.complete', certification_ready: 'enrollments.certification-approve' } as Record<string, string>)[Object.keys(workflowLabels)[Object.keys(workflowLabels).indexOf(enr.workflow_stage) + 1]] || 'enrollments.update') && (
+                        <button onClick={() => advanceWorkflow(enr)} title="Approve next workflow stage" className="inline-flex items-center gap-1 rounded-lg bg-[#fff1f2] px-2.5 py-1.5 text-[11px] font-bold text-[#73111b] hover:bg-[#73111b] hover:text-white">
+                          Approve next <ArrowRight className="h-3 w-3" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))

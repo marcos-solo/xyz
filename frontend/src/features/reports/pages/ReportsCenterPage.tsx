@@ -42,14 +42,27 @@ export const ReportsCenterPage: React.FC = () => {
     fetchReport(reportType);
   }, [reportType]);
 
-  const handleDownloadCsv = () => {
-    const token = localStorage.getItem('iat_token') || localStorage.getItem('apex_token');
-    const params = new URLSearchParams({ token: token || '' });
-    if (branchFilter) params.set('branch_uuid', branchFilter);
-    if (fromDate) params.set('from_date', fromDate);
-    if (toDate) params.set('to_date', toDate);
-    const url = `/api/v1/reports/${reportType}/export?${params.toString()}`;
-    window.open(url, '_blank');
+  const handleDownloadCsv = async () => {
+    try {
+      const response = await api.get(`/reports/${reportType}/export`, {
+        params: {
+          branch_uuid: branchFilter || undefined,
+          from_date: fromDate || undefined,
+          to_date: toDate || undefined,
+        },
+        responseType: 'blob',
+      });
+      const blobUrl = window.URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `report_${reportType}_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error('Failed to export CSV report:', err);
+    }
   };
 
   const clearFilters = () => {

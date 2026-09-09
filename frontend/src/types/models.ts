@@ -166,6 +166,8 @@ export interface Enrollment {
   enrollment_number: string;
   enrollment_date: string;
   status: 'Pending' | 'Active' | 'Completed' | 'Suspended' | 'Withdrawn' | 'Cancelled';
+  workflow_stage: 'registered' | 'branch_review' | 'finance_cleared' | 'in_training' | 'course_completed' | 'certification_ready' | 'certified';
+  workflow_updated_at?: string;
   completion_date?: string;
   final_grade?: string;
   final_score?: number;
