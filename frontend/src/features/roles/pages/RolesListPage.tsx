@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Card } from '../../../components/common/Card';
 import { Badge } from '../../../components/common/Badge';
 import { RoleEditorModal } from '../components/RoleEditorModal';
 import { useAuth } from '../../../context/AuthContext';
 import api from '../../../api/client';
-import { ShieldCheck, Plus, Copy, Edit2, Trash2, Users } from 'lucide-react';
+import { Plus, Copy, Edit2, Trash2 } from 'lucide-react';
 import type { Role } from '../../../types/models';
 
 export const RolesListPage: React.FC = () => {
@@ -82,46 +81,25 @@ export const RolesListPage: React.FC = () => {
         )}
       </div>
 
-      {/* Roles Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         {loading ? (
-          <div className="col-span-full py-16 text-center text-xs text-slate-400">
+          <div className="py-16 text-center text-xs text-slate-400">
             Loading dynamic role hierarchy...
           </div>
         ) : (
-          roles.map((role) => (
-            <Card key={role.uuid} className="flex flex-col justify-between hover:border-slate-300 transition">
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-9 w-9 rounded-xl bg-[#fff1f2] border border-[#fecdd3] flex items-center justify-center text-[#73111b]">
-                      <ShieldCheck className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900">{role.display_name}</h3>
-                      <span className="text-[10px] font-mono text-slate-500 font-medium">{role.name}</span>
-                    </div>
-                  </div>
-                  {role.is_system_protected && <Badge variant="warning">System</Badge>}
-                </div>
-
-                <p className="text-xs text-slate-500 mt-3 line-clamp-2 min-h-[32px]">
-                  {role.description || 'Custom organizational permission bundle.'}
-                </p>
-
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                  <span className="flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5 text-slate-400" />
-                    <span>{role.users_count || 0} Users</span>
-                  </span>
-                  <span className="font-bold text-[#73111b]">
-                    {role.permissions_count || role.permissions?.length || 0} Permissions
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-slate-100 bg-slate-50/70 text-[10px] uppercase tracking-wider text-slate-500">
+                <tr><th className="px-4 py-3.5">Role</th><th className="px-4 py-3.5">Description</th><th className="px-4 py-3.5">Users</th><th className="px-4 py-3.5">Permissions</th><th className="px-4 py-3.5 text-right">Actions</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {roles.map((role) => (
+                  <tr key={role.uuid} className="transition hover:bg-slate-50/70">
+                    <td className="px-4 py-3.5"><div className="flex items-center gap-2.5"><div><p className="font-bold text-slate-900">{role.display_name}</p><p className="font-mono text-[10px] text-slate-500">{role.name}</p></div>{role.is_system_protected && <Badge variant="warning">System</Badge>}</div></td>
+                    <td className="max-w-sm px-4 py-3.5 text-slate-500">{role.description || 'Custom organizational permission bundle.'}</td>
+                    <td className="px-4 py-3.5 font-semibold text-slate-700">{role.users_count || 0}</td>
+                    <td className="px-4 py-3.5 font-semibold text-[#73111b]">{role.permissions_count || role.permissions?.length || 0}</td>
+                    <td className="px-4 py-3.5"><div className="flex items-center justify-end gap-2">
                 <button
                   onClick={() => handleDuplicate(role)}
                   title="Duplicate Role"
@@ -148,9 +126,12 @@ export const RolesListPage: React.FC = () => {
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}
-              </div>
-            </Card>
-          ))
+                    </div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

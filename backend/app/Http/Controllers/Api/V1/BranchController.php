@@ -18,7 +18,7 @@ class BranchController extends Controller
         $user = $request->user();
         $query = Branch::with(['manager', 'departments'])->withCount(['users', 'batches']);
 
-        if (!BranchScopeService::canAccessAllBranches($user) && $user->branch_id) {
+        if (! BranchScopeService::canAccessAllBranches($user) && $user->branch_id) {
             $query->where('id', $user->branch_id);
         }
 
@@ -30,7 +30,7 @@ class BranchController extends Controller
     public function store(Request $request): JsonResponse
     {
         $user = $request->user();
-        if (!$user->can('branches.create')) {
+        if (! $user->can('branches.create')) {
             return ApiResponse::forbidden();
         }
 
@@ -60,7 +60,7 @@ class BranchController extends Controller
     public function update(Request $request, Branch $branch): JsonResponse
     {
         $user = $request->user();
-        if (!$user->can('branches.update')) {
+        if (! $user->can('branches.update')) {
             return ApiResponse::forbidden();
         }
 
@@ -84,12 +84,12 @@ class BranchController extends Controller
     public function destroy(Request $request, Branch $branch): JsonResponse
     {
         $user = $request->user();
-        if (!$user->can('branches.delete')) {
+        if (! $user->can('branches.delete')) {
             return ApiResponse::forbidden();
         }
 
         if ($branch->batches()->where('status', 'ongoing')->exists()) {
-            return ApiResponse::error('Cannot delete branch with ongoing course cohorts.', 422);
+            return ApiResponse::error('Cannot delete branch with ongoing course intakes.', 422);
         }
 
         $branch->delete();

@@ -17,9 +17,74 @@ import {
   CheckCircle2,
   Clock,
   ListChecks,
+  Edit2,
+  Trash2,
 } from 'lucide-react';
 import type { Course, CourseModule, CourseUnit } from '../../../types/models';
 import { useAuth } from '../../../context/AuthContext';
+
+const getEmbeddedVideoUrl = (videoUrl: string): string => {
+  try {
+    const url = new URL(videoUrl);
+
+    if (url.hostname.includes('youtube.com')) {
+      const videoId = url.searchParams.get('v');
+      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+    }
+
+    if (url.hostname === 'youtu.be') {
+      const videoId = url.pathname.slice(1).split('/')[0];
+      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+    }
+
+    if (url.hostname.includes('vimeo.com')) {
+      const videoId = url.pathname.split('/').filter(Boolean).pop();
+      if (videoId && /^\d+$/.test(videoId)) return `https://player.vimeo.com/video/${videoId}`;
+    }
+
+    return videoUrl;
+  } catch {
+    return videoUrl;
+  }
+};
+
+const LessonVideoPlayer: React.FC<{ url: string; title: string }> = ({ url, title }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const isDirectVideo = /\.(mp4|webm|ogg)(\?.*)?$/i.test(url);
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        className="inline-flex items-center gap-1.5 text-xs font-bold text-[#73111b] hover:underline"
+        aria-expanded={isOpen}
+      >
+        <Video className="h-3.5 w-3.5" />
+        {isOpen ? 'Close lesson video' : 'Open lesson video'}
+      </button>
+      {isOpen && (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-950 shadow-sm">
+          <div className="aspect-video w-full">
+            {isDirectVideo ? (
+              <video className="h-full w-full" controls playsInline src={url}>
+                Your browser does not support embedded video playback.
+              </video>
+            ) : (
+              <iframe
+                className="h-full w-full"
+                src={getEmbeddedVideoUrl(url)}
+                title={title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const CurriculumBuilderPage: React.FC = () => {
   const { uuid } = useParams<{ uuid: string }>();
@@ -30,6 +95,10 @@ export const CurriculumBuilderPage: React.FC = () => {
     hasPermission('modules.manage')
     || user?.roles?.some((role) => ['Admin', 'Administrator', 'Super Admin', 'CEO'].includes(role))
   );
+  const canManageLessons = !isStudent && (
+    hasPermission('lessons.manage')
+    || user?.roles?.some((role) => ['Admin', 'Administrator', 'Super Admin', 'CEO'].includes(role))
+  );
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -38,8 +107,10 @@ export const CurriculumBuilderPage: React.FC = () => {
   const [unitTitle, setUnitTitle] = useState('');
   const [unitDesc, setUnitDesc] = useState('');
   const [selectedUnit, setSelectedUnit] = useState<CourseUnit | null>(null);
+  const [editingUnit, setEditingUnit] = useState<CourseUnit | null>(null);
   const [moduleTitle, setModuleTitle] = useState('');
   const [moduleDesc, setModuleDesc] = useState('');
+  const [editingModule, setEditingModule] = useState<CourseModule | null>(null);
   const [collapsedModules, setCollapsedModules] = useState<Set<string>>(new Set());
   const [activeLesson, setActiveLesson] = useState<string | null>(null);
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
@@ -48,6 +119,7 @@ export const CurriculumBuilderPage: React.FC = () => {
 
   const [addLessonOpen, setAddLessonOpen] = useState(false);
   const [selectedModule, setSelectedModule] = useState<CourseModule | null>(null);
+  const [editingLesson, setEditingLesson] = useState<any>(null);
   const [lessonForm, setLessonForm] = useState({
     title: '',
     description: '',
@@ -79,15 +151,20 @@ export const CurriculumBuilderPage: React.FC = () => {
   const handleAddModule = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post(`/courses/${uuid}/modules`, {
-        title: moduleTitle,
-        description: moduleDesc,
-        unit_uuid: selectedUnit?.uuid || undefined,
-      });
+      if (editingModule) {
+        await api.put(`/modules/${editingModule.uuid}`, { title: moduleTitle, description: moduleDesc });
+      } else {
+        await api.post(`/courses/${uuid}/modules`, {
+          title: moduleTitle,
+          description: moduleDesc,
+          unit_uuid: selectedUnit?.uuid || undefined,
+        });
+      }
       setAddModuleOpen(false);
       setModuleTitle('');
       setModuleDesc('');
       setSelectedUnit(null);
+      setEditingModule(null);
       fetchCourse();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to add module.');
@@ -97,10 +174,15 @@ export const CurriculumBuilderPage: React.FC = () => {
   const handleAddUnit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post(`/courses/${uuid}/units`, { title: unitTitle, description: unitDesc });
+      if (editingUnit) {
+        await api.put(`/units/${editingUnit.uuid}`, { title: unitTitle, description: unitDesc });
+      } else {
+        await api.post(`/courses/${uuid}/units`, { title: unitTitle, description: unitDesc });
+      }
       setAddUnitOpen(false);
       setUnitTitle('');
       setUnitDesc('');
+      setEditingUnit(null);
       fetchCourse();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to add unit.');
@@ -112,7 +194,11 @@ export const CurriculumBuilderPage: React.FC = () => {
     if (!selectedModule) return;
 
     try {
-      await api.post(`/modules/${selectedModule.uuid}/lessons`, lessonForm);
+      if (editingLesson) {
+        await api.put(`/lessons/${editingLesson.uuid}`, lessonForm);
+      } else {
+        await api.post(`/modules/${selectedModule.uuid}/lessons`, lessonForm);
+      }
       setAddLessonOpen(false);
       setLessonForm({
         title: '',
@@ -122,9 +208,68 @@ export const CurriculumBuilderPage: React.FC = () => {
         video_url: '',
         duration: 45,
       });
+      setEditingLesson(null);
       fetchCourse();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to add lesson.');
+    }
+  };
+
+  const openUnitEditor = (unit: CourseUnit) => {
+    setEditingUnit(unit);
+    setUnitTitle(unit.title);
+    setUnitDesc(unit.description || '');
+    setAddUnitOpen(true);
+  };
+
+  const deleteUnit = async (unit: CourseUnit) => {
+    if (!window.confirm(`Delete unit "${unit.title}" and its curriculum groups?`)) return;
+    try {
+      await api.delete(`/units/${unit.uuid}`);
+      fetchCourse();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete unit.');
+    }
+  };
+
+  const openModuleEditor = (module: CourseModule) => {
+    setEditingModule(module);
+    setModuleTitle(module.title);
+    setModuleDesc(module.description || '');
+    setAddModuleOpen(true);
+  };
+
+  const deleteModule = async (module: CourseModule) => {
+    if (!window.confirm(`Delete module "${module.title}" and its lessons?`)) return;
+    try {
+      await api.delete(`/modules/${module.uuid}`);
+      fetchCourse();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete module.');
+    }
+  };
+
+  const openLessonEditor = (module: CourseModule, lesson: any) => {
+    setSelectedModule(module);
+    setEditingLesson(lesson);
+    setLessonForm({
+      title: lesson.title,
+      description: lesson.description || '',
+      content_type: lesson.content_type,
+      content: lesson.content || '',
+      video_url: lesson.video_url || '',
+      duration: lesson.duration || 45,
+    });
+    setAddLessonOpen(true);
+  };
+
+  const deleteLesson = async (lesson: any) => {
+    if (!window.confirm(`Delete lesson "${lesson.title}"?`)) return;
+    try {
+      await api.delete(`/lessons/${lesson.uuid}`);
+      fetchCourse();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete lesson.');
     }
   };
 
@@ -208,6 +353,7 @@ export const CurriculumBuilderPage: React.FC = () => {
             </div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">{course.name}</h1>
             {course.category?.name && <p className="text-xs text-slate-500 mt-0.5">Category: {course.category.name}</p>}
+            {course.program_level && <p className="text-xs font-semibold text-[#73111b] mt-1">ACCA {course.program_level} · {course.paper_count} Papers</p>}
           </div>
         </div>
 
@@ -235,7 +381,7 @@ export const CurriculumBuilderPage: React.FC = () => {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#73111b]">Course breakdown</p>
-            <p className="mt-1 text-xs text-slate-600">Work through each unit, module, and lesson in sequence.</p>
+            <p className="mt-1 text-xs text-slate-600">Add the papers as modules under the selected ACCA track, then add lessons inside each module.</p>
           </div>
           <div className="flex items-center gap-4 text-[11px] font-semibold text-slate-600">
             <span className="inline-flex items-center gap-1.5"><ListChecks className="h-3.5 w-3.5 text-[#73111b]" /> {orderedUnits.length} Units</span>
@@ -255,13 +401,17 @@ export const CurriculumBuilderPage: React.FC = () => {
                 <h2 className="text-base font-bold text-slate-900">{unit.title}</h2>
                 {unit.description && <p className="text-xs text-slate-500 mt-0.5">{unit.description}</p>}
               </div>
-              <button
-                hidden={!canManageCurriculum}
-                onClick={() => { setSelectedUnit(unit); setAddModuleOpen(true); }}
-                className="px-3.5 py-1.5 rounded-xl bg-[#73111b] text-white text-xs font-bold flex items-center gap-1.5"
-              >
-                <Plus className="h-3.5 w-3.5" /> Add Module
-              </button>
+              <div className="flex items-center gap-2">
+                <button hidden={!canManageCurriculum} onClick={() => openUnitEditor(unit)} title="Edit unit" className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-[#73111b] hover:bg-white"><Edit2 className="h-3.5 w-3.5" /></button>
+                <button hidden={!canManageCurriculum} onClick={() => deleteUnit(unit)} title="Delete unit" className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-white"><Trash2 className="h-3.5 w-3.5" /></button>
+                <button
+                  hidden={!canManageCurriculum}
+                  onClick={() => { setSelectedUnit(unit); setEditingModule(null); setAddModuleOpen(true); }}
+                  className="px-3.5 py-1.5 rounded-xl bg-[#73111b] text-white text-xs font-bold flex items-center gap-1.5"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Module
+                </button>
+              </div>
             </div>
             <div className="space-y-3 pl-3">
               {unit.modules?.length ? [...unit.modules].sort((first, second) => first.order - second.order).map((module, moduleIndex) => (
@@ -274,6 +424,9 @@ export const CurriculumBuilderPage: React.FC = () => {
                         <p className="text-[11px] text-slate-500">{module.lessons?.length || 0} lessons</p>
                       </div>
                     </div>
+                    <div className="flex items-center gap-1">
+                    <button hidden={!canManageCurriculum} onClick={() => openModuleEditor(module)} title="Edit module" className="p-1 text-slate-400 hover:text-[#73111b]"><Edit2 className="h-3.5 w-3.5" /></button>
+                    <button hidden={!canManageCurriculum} onClick={() => deleteModule(module)} title="Delete module" className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>
                     <button
                       type="button"
                       onClick={() => setCollapsedModules((current) => {
@@ -286,16 +439,20 @@ export const CurriculumBuilderPage: React.FC = () => {
                     >
                       {collapsedModules.has(module.uuid) ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                     </button>
+                    </div>
                   </div>
                   {!collapsedModules.has(module.uuid) && <div className="mt-3 space-y-2 border-t border-slate-100 pt-2">
                     {[...(module.lessons || [])].sort((first, second) => first.order - second.order).map((lesson, lessonIndex) => (
-                      <button key={lesson.uuid} type="button" onClick={() => setActiveLesson(activeLesson === lesson.uuid ? null : lesson.uuid)} className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left hover:bg-slate-50">
+                      <div key={lesson.uuid} className="flex items-center gap-2 rounded-lg px-2 py-2 hover:bg-slate-50">
+                      <button type="button" onClick={() => setActiveLesson(activeLesson === lesson.uuid ? null : lesson.uuid)} className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left">
                         <span className="flex min-w-0 items-center gap-2">
                           {completedLessons.has(lesson.uuid) ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" /> : <span className="w-3.5 shrink-0 text-center text-[10px] font-bold text-slate-400">{lessonIndex + 1}</span>}
                           <span className={`truncate text-[11px] ${completedLessons.has(lesson.uuid) ? 'text-emerald-700 line-through' : 'text-slate-700'}`}>{lesson.title}</span>
                         </span>
                         <span className="inline-flex shrink-0 items-center gap-1 text-[10px] text-slate-400"><Clock className="h-3 w-3" /> {lesson.duration || 30}m</span>
                       </button>
+                      {canManageLessons && <div className="flex shrink-0 items-center gap-1"><button type="button" onClick={() => openLessonEditor(module, lesson)} title="Edit lesson" className="p-1 text-slate-400 hover:text-[#73111b]"><Edit2 className="h-3 w-3" /></button><button type="button" onClick={() => deleteLesson(lesson)} title="Delete lesson" className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="h-3 w-3" /></button></div>}
+                      </div>
                     ))}
                     {activeLesson && module.lessons?.some((lesson) => lesson.uuid === activeLesson) && (() => {
                       const lesson = module.lessons?.find((candidate) => candidate.uuid === activeLesson);
@@ -303,14 +460,14 @@ export const CurriculumBuilderPage: React.FC = () => {
                         <div className="space-y-2 rounded-lg border border-[#fecdd3] bg-[#fffafb] p-3 text-xs text-slate-600">
                           {lesson.description && <p>{lesson.description}</p>}
                           {lesson.content && <p className="whitespace-pre-wrap text-slate-700">{lesson.content}</p>}
-                          {lesson.video_url && <a href={lesson.video_url} target="_blank" rel="noreferrer" className="inline-block font-bold text-[#73111b] hover:underline">Open lesson video</a>}
+                          {lesson.video_url && <LessonVideoPlayer url={lesson.video_url} title={lesson.title} />}
                           {isStudent && <button type="button" disabled={completingLesson === lesson.uuid || completedLessons.has(lesson.uuid)} onClick={() => handleCompleteLesson(lesson.uuid)} className="inline-flex items-center gap-1.5 rounded-xl bg-[#73111b] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#5c0d15] disabled:cursor-not-allowed disabled:bg-emerald-600">
                             {completingLesson === lesson.uuid ? 'Saving progress...' : completedLessons.has(lesson.uuid) ? <><Check className="h-3.5 w-3.5" /> Lesson completed</> : 'Mark lesson complete'}
                           </button>}
                         </div>
                       ) : null;
                     })()}
-                    {canManageCurriculum && <button onClick={() => { setSelectedModule(module); setAddLessonOpen(true); }} className="mt-1 text-[11px] font-bold text-[#73111b]">+ Add Lesson</button>}
+                    {canManageLessons && <button onClick={() => { setSelectedModule(module); setEditingLesson(null); setAddLessonOpen(true); }} className="mt-1 text-[11px] font-bold text-[#73111b]">+ Add Lesson</button>}
                   </div>}
                 </div>
               )) : <p className="text-xs text-slate-400 italic">No modules in this unit yet.</p>}
@@ -383,8 +540,9 @@ export const CurriculumBuilderPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {canManageCurriculum && <><button onClick={() => openModuleEditor(module)} title="Edit module" className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-[#73111b]"><Edit2 className="h-3.5 w-3.5" /></button><button onClick={() => deleteModule(module)} title="Delete module" className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button></>}
                   <button
-                    hidden={!hasPermission('lessons.manage') || collapsedModules.has(module.uuid)}
+                    hidden={!canManageLessons || collapsedModules.has(module.uuid)}
                     onClick={() => {
                       setSelectedModule(module);
                       setAddLessonOpen(true);
@@ -435,12 +593,13 @@ export const CurriculumBuilderPage: React.FC = () => {
                       <div className="flex items-center gap-2">
                         {completedLessons.has(lesson.uuid) && <Badge variant="success"><span className="inline-flex items-center gap-1"><Check className="h-3 w-3" /> Completed</span></Badge>}
                         {lesson.is_preview && <Badge variant="success">Free Preview</Badge>}
+                        {canManageLessons && <><button type="button" onClick={(event) => { event.stopPropagation(); openLessonEditor(module, lesson); }} title="Edit lesson" className="p-1 text-slate-400 hover:text-[#73111b]"><Edit2 className="h-3 w-3" /></button><button type="button" onClick={(event) => { event.stopPropagation(); deleteLesson(lesson); }} title="Delete lesson" className="p-1 text-slate-400 hover:text-rose-600"><Trash2 className="h-3 w-3" /></button></>}
                       </div>
                     </div>
                     {activeLesson === lesson.uuid && <div className="ml-3 p-4 rounded-xl border border-[#fecdd3] bg-[#fffafb] space-y-3">
                       {lesson.description && <p className="text-xs text-slate-600">{lesson.description}</p>}
                       {lesson.content && <p className="text-xs text-slate-700 whitespace-pre-wrap">{lesson.content}</p>}
-                      {lesson.video_url && <a href={lesson.video_url} target="_blank" rel="noreferrer" className="text-xs font-bold text-[#73111b] hover:underline">Open lesson video</a>}
+                      {lesson.video_url && <LessonVideoPlayer url={lesson.video_url} title={lesson.title} />}
                       {isStudent && <button type="button" disabled={completingLesson === lesson.uuid || completedLessons.has(lesson.uuid)} onClick={() => handleCompleteLesson(lesson.uuid)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#73111b] text-white text-xs font-bold transition hover:bg-[#5c0d15] disabled:cursor-not-allowed disabled:bg-emerald-600">
                         {completingLesson === lesson.uuid ? 'Saving progress...' : completedLessons.has(lesson.uuid) ? <><Check className="h-3.5 w-3.5" /> Lesson completed</> : 'Mark lesson complete'}
                       </button>}
@@ -459,7 +618,7 @@ export const CurriculumBuilderPage: React.FC = () => {
       <Modal
         isOpen={addUnitOpen}
         onClose={() => setAddUnitOpen(false)}
-        title="Add Course Unit"
+        title={editingUnit ? 'Edit Course Unit' : 'Add Course Unit'}
         subtitle={`Course: ${course.name}`}
       >
         <form onSubmit={handleAddUnit} className="space-y-4">
@@ -473,7 +632,7 @@ export const CurriculumBuilderPage: React.FC = () => {
           </div>
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <button type="button" onClick={() => setAddUnitOpen(false)} className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700">Cancel</button>
-            <button type="submit" className="px-5 py-2.5 rounded-xl bg-[#73111b] text-xs font-bold text-white">Create Unit</button>
+            <button type="submit" className="px-5 py-2.5 rounded-xl bg-[#73111b] text-xs font-bold text-white">{editingUnit ? 'Save Unit Changes' : 'Create Unit'}</button>
           </div>
         </form>
       </Modal>
@@ -481,7 +640,7 @@ export const CurriculumBuilderPage: React.FC = () => {
       <Modal
         isOpen={addModuleOpen}
         onClose={() => setAddModuleOpen(false)}
-        title="Add Curriculum Module"
+        title={editingModule ? 'Edit Curriculum Module' : 'Add Curriculum Module'}
         subtitle={selectedUnit ? `Unit: ${selectedUnit.title}` : `Course: ${course.name}`}
       >
         <form onSubmit={handleAddModule} className="space-y-4">
@@ -509,7 +668,7 @@ export const CurriculumBuilderPage: React.FC = () => {
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <button
               type="button"
-              onClick={() => setAddModuleOpen(false)}
+              onClick={() => { setAddModuleOpen(false); setEditingModule(null); }}
               className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100"
             >
               Cancel
@@ -518,7 +677,7 @@ export const CurriculumBuilderPage: React.FC = () => {
               type="submit"
               className="px-5 py-2.5 rounded-xl bg-[#73111b] hover:bg-[#5c0d15] text-xs font-bold text-white shadow-md shadow-[#73111b]/20"
             >
-              Create Module
+              {editingModule ? 'Save Module Changes' : 'Create Module'}
             </button>
           </div>
         </form>
@@ -528,7 +687,7 @@ export const CurriculumBuilderPage: React.FC = () => {
       <Modal
         isOpen={addLessonOpen}
         onClose={() => setAddLessonOpen(false)}
-        title="Add Lesson to Module"
+        title={editingLesson ? 'Edit Lesson' : 'Add Lesson to Module'}
         subtitle={`Module: ${selectedModule?.title}`}
       >
         <form onSubmit={handleAddLesson} className="space-y-4">
@@ -596,7 +755,7 @@ export const CurriculumBuilderPage: React.FC = () => {
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <button
               type="button"
-              onClick={() => setAddLessonOpen(false)}
+              onClick={() => { setAddLessonOpen(false); setEditingLesson(null); }}
               className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-100"
             >
               Cancel
@@ -605,7 +764,7 @@ export const CurriculumBuilderPage: React.FC = () => {
               type="submit"
               className="px-5 py-2.5 rounded-xl bg-[#73111b] hover:bg-[#5c0d15] text-xs font-bold text-white shadow-md shadow-[#73111b]/20"
             >
-              Save Lesson
+              {editingLesson ? 'Save Lesson Changes' : 'Save Lesson'}
             </button>
           </div>
         </form>

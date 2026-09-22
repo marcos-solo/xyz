@@ -90,7 +90,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search students, staff, courses, cohorts, certificates..."
+            placeholder="Search students, staff, courses, intakes, certificates..."
             className="w-full bg-transparent text-slate-800 placeholder-slate-400 text-sm focus:outline-none"
           />
           {query && (
@@ -160,11 +160,11 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
             </div>
           )}
 
-          {/* Cohort Batches */}
+          {/* Intake Batches */}
           {results.batches.length > 0 && (
             <div>
               <p className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <FolderKanban className="h-3 w-3 text-purple-600" /> Cohort Batches
+                <FolderKanban className="h-3 w-3 text-purple-600" /> Intake Batches
               </p>
               <div className="space-y-1 mt-1">
                 {results.batches.map((item, idx) => (

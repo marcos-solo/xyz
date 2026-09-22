@@ -10,6 +10,7 @@ import {
   Building,
 } from 'lucide-react';
 import { GlobalSearchModal } from './GlobalSearchModal';
+import { NotificationCenterDropdown } from './NotificationCenterDropdown';
 
 interface TopNavbarProps {
   onOpenMobileSidebar: () => void;
@@ -63,15 +64,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({ onOpenMobileSidebar }) => 
             <span>{user?.roles?.[0] || 'User'}</span>
           </div>
 
-          {/* Notification icon */}
-          <button
-            onClick={() => window.location.href = '/announcements'}
-            className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 relative"
-            title="Announcements"
-          >
-            <Bell className="h-4 w-4" />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#73111b]" />
-          </button>
+          {/* Notification Center */}
+          <NotificationCenterDropdown theme="dark-red" />
 
           {/* User Profile dropdown */}
           <div className="relative">

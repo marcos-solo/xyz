@@ -30,6 +30,7 @@ export const BatchesListPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [branchFilter, setBranchFilter] = useState('');
   const [courseFilter, setCourseFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -58,7 +59,7 @@ export const BatchesListPage: React.FC = () => {
     setLoading(true);
     try {
       const [batchRes, cRes, bRes] = await Promise.all([
-        api.get('/batches', { params: { branch_uuid: branchFilter || undefined, course_uuid: courseFilter || undefined, status: statusFilter || undefined, from_date: fromDate || undefined, to_date: toDate || undefined, page } }),
+        api.get('/batches', { params: { branch_uuid: branchFilter || undefined, category_uuid: categoryFilter || undefined, course_uuid: courseFilter || undefined, status: statusFilter || undefined, from_date: fromDate || undefined, to_date: toDate || undefined, page } }),
         api.get('/courses', { params: { per_page: 100 } }),
         api.get('/branches', { params: { per_page: 100 } }),
       ]);
@@ -75,7 +76,7 @@ export const BatchesListPage: React.FC = () => {
 
   useEffect(() => {
     fetchBatches();
-  }, [branchFilter, courseFilter, statusFilter, fromDate, toDate, page]);
+  }, [branchFilter, categoryFilter, courseFilter, statusFilter, fromDate, toDate, page]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,7 +85,7 @@ export const BatchesListPage: React.FC = () => {
       setCreateOpen(false);
       fetchBatches();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to create cohort batch.');
+      alert(err.response?.data?.message || 'Failed to create intake batch.');
     }
   };
 
@@ -112,7 +113,7 @@ export const BatchesListPage: React.FC = () => {
       setSelectedBatch(null);
       fetchBatches();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to update cohort batch.');
+      alert(err.response?.data?.message || 'Failed to update intake batch.');
     }
   };
 
@@ -129,7 +130,7 @@ export const BatchesListPage: React.FC = () => {
       setSelectedBatch(null);
       fetchBatches();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to delete cohort batch.');
+      alert(err.response?.data?.message || 'Failed to delete intake batch.');
     }
   };
 
@@ -182,8 +183,8 @@ export const BatchesListPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Cohort Batches & Class Groups</h1>
-          <p className="text-xs text-slate-500">Schedule cohort instances, assign certified instructors, and monitor enrollment capacities.</p>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Intake Batches & Class Groups</h1>
+          <p className="text-xs text-slate-500">Schedule intake groups, assign certified instructors, and monitor enrollment capacities.</p>
         </div>
         {hasPermission('batches.create') && (
           <button
@@ -203,120 +204,63 @@ export const BatchesListPage: React.FC = () => {
             className="px-4 py-2.5 rounded-xl bg-[#73111b] hover:bg-[#5c0d15] text-xs font-bold text-white shadow-md shadow-[#73111b]/20 flex items-center gap-2 transition"
           >
             <Plus className="h-4 w-4" />
-            <span>Launch Cohort Batch</span>
+            <span>Launch Intake Batch</span>
           </button>
         )}
       </div>
 
       <Card className="p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-7 gap-3">
+          <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setCourseFilter(''); setPage(1); }} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800"><option value="">All Categories</option>{[...new Map(courses.map((course) => [course.category?.uuid, course.category])).values()].filter(Boolean).map((category: any) => <option key={category.uuid} value={category.uuid}>{category.name}</option>)}</select>
           <select value={branchFilter} onChange={(e) => { setBranchFilter(e.target.value); setPage(1); }} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800">
             <option value="">All Campus Branches</option>
             {branches.map((branch) => <option key={branch.uuid} value={branch.uuid}>{branch.name}</option>)}
           </select>
           <select value={courseFilter} onChange={(e) => { setCourseFilter(e.target.value); setPage(1); }} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800">
             <option value="">All Courses</option>
-            {courses.map((course) => <option key={course.uuid} value={course.uuid}>{course.name}</option>)}
+            {courses.filter((course) => !categoryFilter || course.category?.uuid === categoryFilter).map((course) => <option key={course.uuid} value={course.uuid}>{course.name} ({course.category?.name || 'Uncategorized'})</option>)}
           </select>
           <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800">
-            <option value="">All Cohort Statuses</option><option value="upcoming">Upcoming</option><option value="ongoing">Ongoing</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option>
+            <option value="">All Intake Statuses</option><option value="upcoming">Upcoming</option><option value="ongoing">Ongoing</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option>
           </select>
           <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1); }} aria-label="Start date from" className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800" />
           <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1); }} aria-label="End date to" className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800" />
-          <button onClick={() => { setBranchFilter(''); setCourseFilter(''); setStatusFilter(''); setFromDate(''); setToDate(''); setPage(1); }} className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700">Clear Filters</button>
+          <button onClick={() => { setBranchFilter(''); setCategoryFilter(''); setCourseFilter(''); setStatusFilter(''); setFromDate(''); setToDate(''); setPage(1); }} className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700">Clear Filters</button>
         </div>
       </Card>
 
-      {/* Batches Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Intake batches */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         {loading ? (
-          <div className="col-span-full py-16 text-center text-xs text-slate-400">
-            Loading cohort batches...
+          <div className="py-16 text-center text-xs text-slate-400">
+            Loading intake batches...
           </div>
         ) : (
-          batches.map((b) => (
-            <Card key={b.uuid} className="flex flex-col justify-between hover:border-slate-300 transition">
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="divide-y divide-slate-100">
+          {batches.map((b) => (
+            <div key={b.uuid} className="flex flex-col gap-3 px-4 py-3 transition hover:bg-slate-50 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs font-mono font-bold text-[#73111b]">{b.code}</span>
-                  <div className="flex items-center gap-1.5">
-                    <Badge variant={b.status === 'ongoing' ? 'success' : 'primary'}>{b.status}</Badge>
-                    {hasPermission('batches.update') && (
-                      <button
-                        onClick={() => openEdit(b)}
-                        className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
-                        title="Edit Batch"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                    {hasPermission('batches.delete') && (
-                      <button
-                        onClick={() => openDelete(b)}
-                        className="p-1 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
-                        title="Delete Batch"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
+                  <h3 className="text-sm font-bold text-slate-900">{b.name}</h3>
+                  <Badge variant={b.status === 'ongoing' ? 'success' : 'primary'}>{b.status}</Badge>
                 </div>
-
-                <h3 className="text-base font-bold text-slate-900">{b.name}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">{b.course?.name}</p>
-
-                <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs text-slate-600">
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <Building className="h-3.5 w-3.5 text-slate-400" />
-                      <span>{b.branch?.name}</span>
-                    </span>
-                    <span className="font-bold text-slate-800">
-                      {b.enrollments_count || 0} / {b.capacity} Students
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                      <span>{formatBatchDate(b.start_date)} to {formatBatchDate(b.end_date)}</span>
-                    </span>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100">
-                    <span className="text-slate-400 block mb-1 text-[11px]">Assigned Trainers:</span>
-                    <div className="flex flex-wrap gap-1">
-                      {b.trainers && b.trainers.length > 0 ? (
-                        b.trainers.map((t) => (
-                          <Badge key={t.uuid} variant="info">
-                            {t.full_name}
-                          </Badge>
-                        ))
-                      ) : (
-                        <span className="text-amber-600 italic text-[11px]">No trainer assigned</span>
-                      )}
-                    </div>
-                  </div>
+                <p className="mt-1 text-xs text-slate-500">{b.course?.category?.name || 'Uncategorized'} / {b.course?.name} · {b.branch?.name}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+                  <span className="inline-flex items-center gap-1"><Calendar className="h-3.5 w-3.5 text-slate-400" /> {formatBatchDate(b.start_date)} to {formatBatchDate(b.end_date)}</span>
+                  <span className="inline-flex items-center gap-1"><Building className="h-3.5 w-3.5 text-slate-400" /> {b.enrollments_count || 0} / {b.capacity} Students</span>
+                  <span className="inline-flex items-center gap-1"><UserCheck className="h-3.5 w-3.5 text-slate-400" /> {b.trainers?.length || 0} Trainers</span>
                 </div>
               </div>
-
-              {/* Actions */}
-              <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
-                <a
-                  href={`/batches/${b.uuid}/attendance`}
-                  className="text-xs font-bold text-slate-600 hover:text-[#73111b]"
-                >
-                  Attendance Matrix
-                </a>
-                <button
-                  onClick={() => openAssignModal(b)}
-                  className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-800 flex items-center gap-1.5 transition"
-                >
-                  <UserCheck className="h-3.5 w-3.5 text-[#73111b]" /> Assign Trainers
-                </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {hasPermission('batches.update') && <button onClick={() => openEdit(b)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700" title="Edit Batch"><Edit2 className="h-3.5 w-3.5" /></button>}
+                {hasPermission('batches.delete') && <button onClick={() => openDelete(b)} className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600" title="Delete Batch"><Trash2 className="h-3.5 w-3.5" /></button>}
+                <a href={`/batches/${b.uuid}/attendance`} className="text-xs font-bold text-slate-600 hover:text-[#73111b]">Attendance</a>
+                <button onClick={() => openAssignModal(b)} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-200"><UserCheck className="h-3.5 w-3.5 text-[#73111b]" /> Assign</button>
               </div>
-            </Card>
-          ))
+            </div>
+          ))}
+          </div>
         )}
       </div>
       <Pagination currentPage={pagination.current_page} lastPage={pagination.last_page} total={pagination.total} onPageChange={setPage} />
@@ -325,7 +269,7 @@ export const BatchesListPage: React.FC = () => {
       <Modal
         isOpen={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="Launch Cohort Batch"
+        title="Launch Intake Batch"
         subtitle="Schedule a new course intake batch"
       >
         <form onSubmit={handleCreate} className="space-y-4">
@@ -379,7 +323,7 @@ export const BatchesListPage: React.FC = () => {
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g. CCNA Morning Cohort Q1"
+                placeholder="e.g. CCNA Morning Intake Q1"
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-[#73111b]"
               />
             </div>
@@ -429,7 +373,7 @@ export const BatchesListPage: React.FC = () => {
               type="submit"
               className="px-5 py-2.5 rounded-xl bg-[#73111b] hover:bg-[#5c0d15] text-xs font-bold text-white shadow-md shadow-[#73111b]/20"
             >
-              Create Cohort
+              Create Intake
             </button>
           </div>
         </form>
@@ -439,7 +383,7 @@ export const BatchesListPage: React.FC = () => {
       <Modal
         isOpen={editOpen}
         onClose={() => setEditOpen(false)}
-        title="Edit Cohort Batch"
+        title="Edit Intake Batch"
         subtitle={`Updating ${selectedBatch?.name}`}
       >
         <form onSubmit={handleEditSubmit} className="space-y-4">
@@ -565,14 +509,14 @@ export const BatchesListPage: React.FC = () => {
       <Modal
         isOpen={deleteOpen}
         onClose={() => setDeleteOpen(false)}
-        title="Delete Cohort Batch"
+        title="Delete Intake Batch"
         subtitle={`Confirmation for ${selectedBatch?.name}`}
       >
         <div className="space-y-4">
           <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
             <div className="text-xs text-rose-800">
-              <p className="font-bold">Are you sure you want to delete this cohort batch?</p>
+              <p className="font-bold">Are you sure you want to delete this intake batch?</p>
               <p className="mt-1">
                 Deleting <strong>{selectedBatch?.name}</strong> will remove its timetable and student enrollments.
               </p>
@@ -602,8 +546,8 @@ export const BatchesListPage: React.FC = () => {
       <Modal
         isOpen={assignOpen}
         onClose={() => setAssignOpen(false)}
-        title="Assign Trainers to Cohort"
-        subtitle={`Cohort: ${selectedBatch?.name}`}
+        title="Assign Trainers to Intake"
+        subtitle={`Intake: ${selectedBatch?.name}`}
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-500 font-medium">Select certified instructors to lead this batch:</p>

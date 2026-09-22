@@ -1,9 +1,62 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card } from '../../../components/common/Card';
 import { Badge } from '../../../components/common/Badge';
 import api from '../../../api/client';
-import { Download, RotateCcw } from 'lucide-react';
+import { Download, RotateCcw, CalendarRange, TrendingUp } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from 'recharts';
 import type { Branch } from '../../../types/models';
+
+const quickRanges = [
+  { id: '7d', label: 'Last 7 days' },
+  { id: '30d', label: 'Last 30 days' },
+  { id: '90d', label: 'Last 90 days' },
+  { id: 'this-month', label: 'This month' },
+  { id: 'this-quarter', label: 'This quarter' },
+];
+
+const formatDate = (date: Date) => date.toISOString().slice(0, 10);
+
+const getRangeDates = (rangeId: string) => {
+  const now = new Date();
+  const endDate = new Date(now);
+
+  switch (rangeId) {
+    case '7d': {
+      const start = new Date(now);
+      start.setDate(now.getDate() - 6);
+      return { from: formatDate(start), to: formatDate(endDate) };
+    }
+    case '30d': {
+      const start = new Date(now);
+      start.setDate(now.getDate() - 29);
+      return { from: formatDate(start), to: formatDate(endDate) };
+    }
+    case '90d': {
+      const start = new Date(now);
+      start.setDate(now.getDate() - 89);
+      return { from: formatDate(start), to: formatDate(endDate) };
+    }
+    case 'this-month': {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { from: formatDate(start), to: formatDate(endDate) };
+    }
+    case 'this-quarter': {
+      const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+      const start = new Date(now.getFullYear(), quarterStartMonth, 1);
+      return { from: formatDate(start), to: formatDate(endDate) };
+    }
+    default:
+      return { from: '', to: '' };
+  }
+};
 
 export const ReportsCenterPage: React.FC = () => {
   const [reportType, setReportType] = useState('enrollments');
@@ -34,6 +87,99 @@ export const ReportsCenterPage: React.FC = () => {
     }
   };
 
+  const summaryCards = useMemo(() => {
+    const rows = data ?? [];
+
+    switch (reportType) {
+      case 'enrollments': {
+        const total = rows.length;
+        const active = rows.filter((row) => String(row.status || '').toLowerCase() === 'active').length;
+        const avgScore = rows
+          .map((row) => Number(row.final_score ?? 0))
+          .filter((value) => Number.isFinite(value) && value > 0)
+          .reduce((sum, value) => sum + value, 0);
+        return [
+          { label: 'Total enrollments', value: total.toLocaleString(), hint: 'records in view' },
+          { label: 'Active students', value: active.toLocaleString(), hint: 'currently active' },
+          { label: 'Average score', value: total ? `${Math.round(avgScore / total)}%` : '0%', hint: 'completion benchmark' },
+          { label: 'Latest cohort', value: rows[0]?.batch || 'N/A', hint: rows[0]?.branch || 'No data' },
+        ];
+      }
+      case 'branches': {
+        const totalStudents = rows.reduce((sum, row) => sum + Number(row.total_students || 0), 0);
+        const totalEnrollments = rows.reduce((sum, row) => sum + Number(row.total_enrollments || 0), 0);
+        const activeCohorts = rows.reduce((sum, row) => sum + Number(row.active_cohorts || 0), 0);
+        return [
+          { label: 'Branch count', value: rows.length.toLocaleString(), hint: 'campuses in scope' },
+          { label: 'Students tracked', value: totalStudents.toLocaleString(), hint: 'across selected branches' },
+          { label: 'Enrollments', value: totalEnrollments.toLocaleString(), hint: 'total student intake' },
+          { label: 'Active cohorts', value: activeCohorts.toLocaleString(), hint: 'ongoing batches' },
+        ];
+      }
+      case 'attendance': {
+        const rates = rows
+          .map((row) => Number(String(row.average_attendance_rate || '0').replace('%', '')))
+          .filter((val) => Number.isFinite(val));
+        const averageRate = rates.length ? rates.reduce((sum, val) => sum + val, 0) / rates.length : 0;
+        return [
+          { label: 'Sessions tracked', value: rows.length.toLocaleString(), hint: 'cohorts in view' },
+          { label: 'Average attendance', value: `${averageRate.toFixed(1)}%`, hint: 'across all batches' },
+          { label: 'Students present', value: rows.length ? `${Math.round(averageRate)}%` : '0%', hint: 'attendance benchmark' },
+          { label: 'Operational pulse', value: averageRate >= 75 ? 'Healthy' : 'Monitor', hint: averageRate >= 75 ? 'above threshold' : 'below target' },
+        ];
+      }
+      case 'certificates': {
+        const issued = rows.filter((row) => String(row.status || '').toLowerCase() === 'issued').length;
+        const verified = rows.filter((row) => String(row.status || '').toLowerCase() === 'verified').length;
+        return [
+          { label: 'Certificates', value: rows.length.toLocaleString(), hint: 'records in view' },
+          { label: 'Issued', value: issued.toLocaleString(), hint: 'already released' },
+          { label: 'Verified', value: verified.toLocaleString(), hint: 'valid credentials' },
+          { label: 'Executive view', value: rows[0]?.branch || 'All', hint: 'latest active branch' },
+        ];
+      }
+      default:
+        return [];
+    }
+  }, [data, reportType]);
+
+  const chartData = useMemo(() => {
+    if (!data.length) return [];
+
+    switch (reportType) {
+      case 'enrollments': {
+        const counts = data.reduce<Record<string, number>>((acc, row) => {
+          const key = String(row.status || 'Unknown');
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {});
+        return Object.entries(counts).map(([name, value]) => ({ name, value }));
+      }
+      case 'branches': {
+        return data.slice(0, 8).map((row) => ({
+          name: String(row.branch_name || row.branch || 'Branch'),
+          value: Number(row.total_enrollments || row.total_students || 0),
+        }));
+      }
+      case 'attendance': {
+        return data.slice(0, 8).map((row) => ({
+          name: String(row.cohort || row.branch || 'Batch'),
+          value: Number(String(row.average_attendance_rate || '0').replace('%', '')) || 0,
+        }));
+      }
+      case 'certificates': {
+        const counts = data.reduce<Record<string, number>>((acc, row) => {
+          const key = String(row.status || 'Unknown');
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {});
+        return Object.entries(counts).map(([name, value]) => ({ name, value }));
+      }
+      default:
+        return [];
+    }
+  }, [data, reportType]);
+
   useEffect(() => {
     api.get('/branches').then((res) => setBranches(res.data.data || []));
   }, []);
@@ -41,6 +187,10 @@ export const ReportsCenterPage: React.FC = () => {
   useEffect(() => {
     fetchReport(reportType);
   }, [reportType]);
+
+  useEffect(() => {
+    fetchReport(reportType);
+  }, [branchFilter, fromDate, toDate]);
 
   const handleDownloadCsv = async () => {
     try {
@@ -110,8 +260,72 @@ export const ReportsCenterPage: React.FC = () => {
         ))}
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        {summaryCards.map((card) => (
+          <Card key={card.label} className="p-4">
+            <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-slate-500">
+              <span>{card.label}</span>
+              <TrendingUp className="h-3.5 w-3.5 text-[#73111b]" />
+            </div>
+            <div className="mt-3 text-2xl font-bold text-slate-900">{card.value}</div>
+            <div className="mt-1 text-[11px] text-slate-500">{card.hint}</div>
+          </Card>
+        ))}
+      </div>
+
       <Card className="p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Trend snapshot</h2>
+            <p className="mt-1 text-xs text-slate-500">Current view by category</p>
+          </div>
+        </div>
+
+        {chartData.length > 0 ? (
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 8, right: 12, left: -18, bottom: 14 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#475569' }} interval={0} angle={-10} textAnchor="end" height={50} />
+                <YAxis tick={{ fontSize: 10, fill: '#475569' }} />
+                <Tooltip
+                  formatter={(value: any) => [value ?? 0, 'Value']}
+                  contentStyle={{ borderRadius: 12, borderColor: '#e2e8f0', fontSize: 11 }}
+                />
+                <Bar dataKey="value" fill="#73111b" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="py-10 text-center text-xs text-slate-400">No chart data available for this report.</div>
+        )}
+      </Card>
+
+      <Card className="p-4">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+            <CalendarRange className="h-3.5 w-3.5" />
+            Quick date ranges
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {quickRanges.map((range) => (
+              <button
+                key={range.id}
+                type="button"
+                onClick={() => {
+                  const { from, to } = getRangeDates(range.id);
+                  setFromDate(from);
+                  setToDate(to);
+                }}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 hover:border-[#73111b] hover:text-[#73111b]"
+              >
+                {range.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
           <select
             value={branchFilter}
             onChange={(e) => setBranchFilter(e.target.value)}

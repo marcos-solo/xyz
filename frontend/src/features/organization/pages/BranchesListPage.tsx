@@ -184,7 +184,7 @@ export const BranchesListPage: React.FC = () => {
                 </span>
                 <span className="flex items-center gap-1 text-[#73111b] font-bold">
                   <FolderKanban className="h-3.5 w-3.5" />
-                  <span>{b.batches_count || 0} Cohorts</span>
+                  <span>{b.batches_count || 0} Intakes</span>
                 </span>
               </div>
             </Card>
@@ -382,7 +382,7 @@ export const BranchesListPage: React.FC = () => {
             <div className="text-xs text-rose-800">
               <p className="font-bold">Are you sure you want to delete this branch?</p>
               <p className="mt-1">
-                Archiving <strong>{selectedBranch?.name}</strong> will remove it from active directory views. Branches with ongoing cohorts cannot be deleted.
+                Archiving <strong>{selectedBranch?.name}</strong> will remove it from active directory views. Branches with ongoing intakes cannot be deleted.
               </p>
             </div>
           </div>

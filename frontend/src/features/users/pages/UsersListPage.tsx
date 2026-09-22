@@ -284,17 +284,19 @@ export const UsersListPage: React.FC = () => {
                             <Edit2 className="h-3.5 w-3.5" />
                           </button>
                         )}
-                        <button
-                          onClick={() => handleToggleStatus(u)}
-                          title={u.status === 'active' ? 'Deactivate User' : 'Activate User'}
-                          className={`p-1.5 rounded-lg border transition ${
-                            u.status === 'active'
-                              ? 'border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50'
-                              : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
-                          }`}
-                        >
-                          {u.status === 'active' ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
-                        </button>
+                        {hasPermission('users.update') && (
+                          <button
+                            onClick={() => handleToggleStatus(u)}
+                            title={u.status === 'active' ? 'Deactivate User' : 'Activate User'}
+                            className={`p-1.5 rounded-lg border transition ${
+                              u.status === 'active'
+                                ? 'border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50'
+                                : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
+                            }`}
+                          >
+                            {u.status === 'active' ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
+                          </button>
+                        )}
                         {hasPermission('users.delete') && (
                           <button
                             onClick={() => openDelete(u)}
@@ -303,6 +305,11 @@ export const UsersListPage: React.FC = () => {
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
+                        )}
+                        {!hasPermission('users.update') && !hasPermission('users.delete') && (
+                          <span className="text-[10px] text-slate-400 italic font-medium px-2 py-0.5 rounded bg-slate-50 border border-slate-200">
+                            View only
+                          </span>
                         )}
                       </div>
                     </td>

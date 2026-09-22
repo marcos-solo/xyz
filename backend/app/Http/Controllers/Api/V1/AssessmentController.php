@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
 use App\Models\Assessment;
 use App\Models\CourseBatch;
-use App\Models\Organization;
 use App\Services\AuditLogService;
 use App\Services\BranchScopeService;
 use Illuminate\Http\JsonResponse;
@@ -22,13 +21,13 @@ class AssessmentController extends Controller
 
         if ($authUser->hasRole('Student')) {
             $query->where('status', 'published')
-                ->whereHas('batch.enrollments', fn($q) => $q
+                ->whereHas('batch.enrollments', fn ($q) => $q
                     ->where('student_id', $authUser->id)
-                    ->whereIn('status', ['Pending', 'Active']));
+                    ->whereIn('workflow_stage', ['branch_review', 'finance_cleared', 'in_training', 'course_completed', 'certification_ready', 'certified']));
         }
 
-        if (!BranchScopeService::canAccessAllBranches($authUser) && $authUser->branch_id) {
-            $query->whereHas('batch', fn($q) => $q->where('branch_id', $authUser->branch_id));
+        if (! BranchScopeService::canAccessAllBranches($authUser) && $authUser->branch_id) {
+            $query->whereHas('batch', fn ($q) => $q->where('branch_id', $authUser->branch_id));
         }
 
         if ($request->filled('batch_uuid')) {
@@ -56,7 +55,7 @@ class AssessmentController extends Controller
     public function store(Request $request): JsonResponse
     {
         $authUser = $request->user();
-        if (!$authUser->can('assessments.create')) {
+        if (! $authUser->can('assessments.create')) {
             return ApiResponse::forbidden();
         }
 
@@ -118,7 +117,7 @@ class AssessmentController extends Controller
     public function update(Request $request, Assessment $assessment): JsonResponse
     {
         $authUser = $request->user();
-        if (!$authUser->can('assessments.update')) {
+        if (! $authUser->can('assessments.update')) {
             return ApiResponse::forbidden();
         }
 
@@ -150,6 +149,7 @@ class AssessmentController extends Controller
     public function destroy(Assessment $assessment): JsonResponse
     {
         $assessment->delete();
+
         return ApiResponse::success(null, 'Assessment deleted.');
     }
 }

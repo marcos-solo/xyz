@@ -290,33 +290,17 @@ export const UserCreateWizardModal: React.FC<UserCreateWizardModalProps> = ({ is
       {/* STEP 4 */}
       {step === 4 && (
         <div className="space-y-4 animate-in fade-in duration-150">
-          <p className="text-xs text-slate-500 font-medium">Select one or multiple dynamic roles to assign system permissions:</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto">
-            {roles.map((r) => {
-              const isChecked = formData.roles.includes(r.name);
-              return (
-                <div
-                  key={r.uuid}
-                  onClick={() => handleRoleToggle(r.name)}
-                  className={`p-3.5 rounded-xl border cursor-pointer transition flex items-start gap-3 ${
-                    isChecked
-                      ? 'bg-[#fff1f2] border-[#fecdd3]'
-                      : 'bg-white border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={() => {}}
-                    className="mt-0.5 rounded border-slate-300 text-[#73111b] focus:ring-[#73111b]"
-                  />
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">{r.display_name || r.name}</p>
-                    <p className="text-[10px] text-slate-500 line-clamp-1">{r.description || 'Custom role'}</p>
-                  </div>
-                </div>
-              );
-            })}
+          <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Roles *</label>
+          <select
+            multiple
+            value={formData.roles}
+            onChange={(e) => setFormData({ ...formData, roles: Array.from(e.target.selectedOptions, (option) => option.value) })}
+            className="w-full min-h-40 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-[#73111b]"
+          >
+            {roles.map((r) => <option key={r.uuid} value={r.name}>{r.display_name || r.name}</option>)}
+          </select>
+          <div className="flex flex-wrap gap-1.5">
+            {formData.roles.map((roleName) => <Badge key={roleName} variant="primary">{roles.find((role) => role.name === roleName)?.display_name || roleName}</Badge>)}
           </div>
         </div>
       )}

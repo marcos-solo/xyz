@@ -158,14 +158,14 @@ export const AssessmentsListPage: React.FC = () => {
         <form onSubmit={handleCreate} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Target Cohort Batch *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Target Intake Batch *</label>
               <select
                 required
                 value={formData.batch_uuid}
                 onChange={(e) => setFormData({ ...formData, batch_uuid: e.target.value })}
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-[#73111b]"
               >
-                <option value="">Select Cohort Batch</option>
+                <option value="">Select Intake Batch</option>
                 {batches.map((b) => (
                   <option key={b.uuid} value={b.uuid}>{b.name} ({b.code})</option>
                 ))}

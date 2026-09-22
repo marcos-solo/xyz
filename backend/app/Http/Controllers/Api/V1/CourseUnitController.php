@@ -19,7 +19,7 @@ class CourseUnitController extends Controller
 
     public function store(Request $request, Course $course): JsonResponse
     {
-        if (!$this->canManageCurriculum($request)) {
+        if (! $this->canManageCurriculum($request)) {
             return ApiResponse::forbidden();
         }
 
@@ -41,7 +41,7 @@ class CourseUnitController extends Controller
 
     public function update(Request $request, CourseUnit $unit): JsonResponse
     {
-        if (!$this->canManageCurriculum($request)) {
+        if (! $this->canManageCurriculum($request)) {
             return ApiResponse::forbidden();
         }
 
@@ -57,11 +57,17 @@ class CourseUnitController extends Controller
 
     public function destroy(Request $request, CourseUnit $unit): JsonResponse
     {
-        if (!$this->canManageCurriculum($request)) {
+        if (! $this->canManageCurriculum($request)) {
             return ApiResponse::forbidden();
         }
 
+        foreach ($unit->modules as $module) {
+            $module->lessons()->delete();
+            $module->delete();
+        }
+
         $unit->delete();
+
         return ApiResponse::success(null, 'Unit deleted.');
     }
 }

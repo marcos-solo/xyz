@@ -30,18 +30,18 @@ class GlobalSearchController extends Controller
         $students = User::role('Student')
             ->where(function ($q) use ($term) {
                 $q->where('first_name', 'like', "%{$term}%")
-                  ->orWhere('last_name', 'like', "%{$term}%")
-                  ->orWhere('email', 'like', "%{$term}%")
-                  ->orWhereHas('studentProfile', fn($sq) => $sq->where('student_number', 'like', "%{$term}%"));
+                    ->orWhere('last_name', 'like', "%{$term}%")
+                    ->orWhere('email', 'like', "%{$term}%")
+                    ->orWhereHas('studentProfile', fn ($sq) => $sq->where('student_number', 'like', "%{$term}%"));
             })
             ->with('studentProfile', 'branch')
             ->take(5)
             ->get()
-            ->map(fn($u) => [
+            ->map(fn ($u) => [
                 'type' => 'student',
                 'uuid' => $u->uuid,
                 'title' => $u->full_name,
-                'subtitle' => $u->studentProfile?->student_number . ' • ' . ($u->branch?->name ?? 'Main'),
+                'subtitle' => $u->studentProfile?->student_number.' • '.($u->branch?->name ?? 'Main'),
                 'url' => "/students/{$u->studentProfile?->uuid}",
             ]);
 
@@ -49,17 +49,17 @@ class GlobalSearchController extends Controller
         $staff = User::whereHas('staffProfile')
             ->where(function ($q) use ($term) {
                 $q->where('first_name', 'like', "%{$term}%")
-                  ->orWhere('last_name', 'like', "%{$term}%")
-                  ->orWhere('email', 'like', "%{$term}%");
+                    ->orWhere('last_name', 'like', "%{$term}%")
+                    ->orWhere('email', 'like', "%{$term}%");
             })
             ->with('staffProfile', 'branch')
             ->take(5)
             ->get()
-            ->map(fn($u) => [
+            ->map(fn ($u) => [
                 'type' => 'staff',
                 'uuid' => $u->uuid,
                 'title' => $u->full_name,
-                'subtitle' => $u->staffProfile?->job_title . ' • ' . ($u->branch?->name ?? 'Main'),
+                'subtitle' => $u->staffProfile?->job_title.' • '.($u->branch?->name ?? 'Main'),
                 'url' => "/staff/{$u->staffProfile?->uuid}",
             ]);
 
@@ -68,7 +68,7 @@ class GlobalSearchController extends Controller
             ->orWhere('code', 'like', "%{$term}%")
             ->take(5)
             ->get()
-            ->map(fn($c) => [
+            ->map(fn ($c) => [
                 'type' => 'course',
                 'uuid' => $c->uuid,
                 'title' => $c->name,
@@ -82,11 +82,11 @@ class GlobalSearchController extends Controller
             ->with('branch', 'course')
             ->take(5)
             ->get()
-            ->map(fn($b) => [
+            ->map(fn ($b) => [
                 'type' => 'batch',
                 'uuid' => $b->uuid,
                 'title' => $b->name,
-                'subtitle' => "Cohort: {$b->code} • {$b->branch?->name}",
+                'subtitle' => "Intake: {$b->code} • {$b->branch?->name}",
                 'url' => "/batches/{$b->uuid}",
             ]);
 
@@ -96,12 +96,12 @@ class GlobalSearchController extends Controller
             ->with('student', 'course')
             ->take(5)
             ->get()
-            ->map(fn($c) => [
+            ->map(fn ($c) => [
                 'type' => 'certificate',
                 'uuid' => $c->uuid,
                 'title' => $c->certificate_number,
                 'subtitle' => "Student: {$c->student?->full_name} • {$c->course?->name}",
-                'url' => "/certificates",
+                'url' => '/certificates',
             ]);
 
         return ApiResponse::success([

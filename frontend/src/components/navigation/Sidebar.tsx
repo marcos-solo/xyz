@@ -33,7 +33,9 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) => {
   const { user, hasPermission } = useAuth();
 
-  const isStudent = user?.roles?.includes('Student');
+  const isGuest = user?.roles?.includes('Guest') ?? false;
+  const isStudent = (user?.roles?.includes('Student') ?? false) && !isGuest;
+  const isAdmissionsOfficer = user?.roles?.includes('Admissions Officer');
 
   const navigationGroups = [
     {
@@ -43,7 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
           name: 'Dashboard',
           path: '/dashboard',
           icon: LayoutDashboard,
-          show: true,
+          show: !isAdmissionsOfficer,
         },
       ],
     },
@@ -78,10 +80,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
             ],
           },
           {
-            title: 'Academics & Cohorts',
+            title: 'Academics & Intakes',
             items: [
               { name: 'Courses & Curriculum', path: '/courses', icon: BookMarked, show: hasPermission('courses.view') },
-              { name: 'Batches / Cohorts', path: '/batches', icon: FolderKanban, show: hasPermission('batches.view') },
+              { name: 'Batches / Intakes', path: '/batches', icon: FolderKanban, show: hasPermission('batches.view') },
               { name: 'Enrollments', path: '/enrollments', icon: GraduationCap, show: hasPermission('enrollments.view') },
               { name: 'Finance & Clearance', path: '/finance', icon: WalletCards, show: hasPermission('finance.view') },
             ],
@@ -103,6 +105,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
               { name: 'Settings', path: '/settings', icon: Settings, show: hasPermission('settings.view') },
             ],
           },
+          ...(isGuest
+            ? [
+                {
+                  title: 'Student Portal (Preview)',
+                  items: [
+                    { name: 'Course Catalog', path: '/catalog', icon: BookOpen, show: true },
+                    { name: 'Learning Paths', path: '/paths', icon: GraduationCap, show: true },
+                    { name: 'My Enrolled Courses', path: '/my-courses', icon: BookMarked, show: true },
+                    { name: 'Class Timetable', path: '/timetable', icon: CalendarDays, show: true },
+                    { name: 'Assessments', path: '/my-assessments', icon: FileCheck2, show: true },
+                    { name: 'Credentials & Certs', path: '/credentials', icon: Award, show: true },
+                  ],
+                },
+              ]
+            : []),
         ]),
   ];
 

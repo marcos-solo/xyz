@@ -99,7 +99,7 @@ class EnrollmentController extends Controller
             ->exists();
 
         if ($existsActive) {
-            return ApiResponse::error('Student already has an active or pending enrollment in this cohort.', 422);
+            return ApiResponse::error('Student already has an active or pending enrollment in this intake.', 422);
         }
 
         // 2. Check batch capacity
@@ -144,6 +144,58 @@ class EnrollmentController extends Controller
         );
     }
 
+    /**
+     * Student self-applies for a batch intake.
+     */
+    public function apply(Request $request): JsonResponse
+    {
+        $student = $request->user();
+        if (! $student->hasRole('Student')) {
+            return ApiResponse::forbidden('Only students can apply for an intake.');
+        }
+
+        $validated = $request->validate([
+            'batch_uuid' => ['required', 'exists:course_batches,uuid'],
+        ]);
+
+        $batch = CourseBatch::where('uuid', $validated['batch_uuid'])->firstOrFail();
+
+        $existsActive = Enrollment::where('student_id', $student->id)
+            ->where('batch_id', $batch->id)
+            ->whereIn('status', ['Active', 'Pending'])
+            ->exists();
+
+        if ($existsActive) {
+            return ApiResponse::error('You already have an active or pending application for this intake.', 422);
+        }
+
+        $year = Carbon::now()->format('Y');
+        $seq = Enrollment::whereYear('created_at', $year)->count() + 1;
+        $enrollmentNumber = sprintf('ENR-%s-%04d', $year, $seq);
+
+        $enrollment = Enrollment::create([
+            'student_id' => $student->id,
+            'batch_id' => $batch->id,
+            'enrollment_number' => $enrollmentNumber,
+            'enrollment_date' => now()->format('Y-m-d'),
+            'status' => 'Pending',
+            'workflow_stage' => 'registered',
+            'workflow_updated_by' => null,
+            'workflow_updated_at' => now(),
+        ]);
+
+        EnrollmentFinance::create([
+            'enrollment_id' => $enrollment->id,
+            'currency' => $student->organization?->settings['currency'] ?? 'KES',
+        ]);
+
+        return ApiResponse::success(
+            $enrollment->load(['batch.course', 'batch.branch']),
+            'Your application for '.$batch->name.' has been submitted. The Admissions team will review and approve your intake enrollment.',
+            201
+        );
+    }
+
     public function advanceWorkflow(Request $request, Enrollment $enrollment): JsonResponse
     {
         $authUser = $request->user();
@@ -173,6 +225,12 @@ class EnrollmentController extends Controller
             'certification_ready' => 'enrollments.certification-approve',
             default => 'enrollments.update',
         };
+        if ($validated['stage'] === 'branch_review'
+            && $enrollment->workflow_updated_by === null
+            && ! $authUser->hasRole('Admissions Officer')
+            && ! $authUser->hasRole('Super Admin')) {
+            return ApiResponse::forbidden();
+        }
         if (! $authUser->can($requiredPermission)) {
             return ApiResponse::forbidden();
         }

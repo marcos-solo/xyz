@@ -7,14 +7,12 @@ use App\Models\AssessmentAttempt;
 use App\Models\AssignmentSubmission;
 use App\Models\CourseBatch;
 use App\Models\Enrollment;
-use App\Models\GradingScaleRange;
 use App\Models\GradingScheme;
-use App\Models\User;
 
 class GradebookCalculationService
 {
     /**
-     * Compute full gradebook matrix for a cohort batch.
+     * Compute full gradebook matrix for an intake batch.
      */
     public static function getBatchGradebook(CourseBatch $batch): array
     {
@@ -36,7 +34,9 @@ class GradebookCalculationService
 
         foreach ($enrollments as $enrollment) {
             $student = $enrollment->student;
-            if (!$student) continue;
+            if (! $student) {
+                continue;
+            }
 
             $assessmentScores = [];
             $totalWeightedScore = 0;
@@ -102,7 +102,9 @@ class GradebookCalculationService
                 'student_number' => $student->studentProfile?->student_number ?? 'N/A',
                 'assessments' => $assessmentScores,
                 'final_score' => $finalScore,
+                'total_weighted_score' => $finalScore,
                 'final_grade' => $gradeLetter,
+                'passed' => $finalScore >= 50,
             ];
         }
 
@@ -113,7 +115,7 @@ class GradebookCalculationService
                 'code' => $batch->code,
                 'course' => $batch->course?->name,
             ],
-            'assessments' => $assessments->map(fn($a) => [
+            'assessments' => $assessments->map(fn ($a) => [
                 'uuid' => $a->uuid,
                 'title' => $a->title,
                 'type' => $a->type,
@@ -121,6 +123,7 @@ class GradebookCalculationService
                 'total_marks' => (float) $a->total_marks,
             ]),
             'students' => $rows,
+            'matrix' => $rows,
         ];
     }
 
@@ -138,10 +141,19 @@ class GradebookCalculationService
         }
 
         // Fallback default
-        if ($score >= 80) return 'A';
-        if ($score >= 70) return 'B';
-        if ($score >= 60) return 'C';
-        if ($score >= 50) return 'D';
+        if ($score >= 80) {
+            return 'A';
+        }
+        if ($score >= 70) {
+            return 'B';
+        }
+        if ($score >= 60) {
+            return 'C';
+        }
+        if ($score >= 50) {
+            return 'D';
+        }
+
         return 'F';
     }
 }

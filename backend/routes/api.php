@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\ClassSessionController;
 use App\Http\Controllers\Api\V1\CourseBatchController;
 use App\Http\Controllers\Api\V1\CourseCategoryController;
 use App\Http\Controllers\Api\V1\CourseController;
+use App\Http\Controllers\Api\V1\CourseFeedbackController;
 use App\Http\Controllers\Api\V1\CourseModuleController;
 use App\Http\Controllers\Api\V1\CourseUnitController;
 use App\Http\Controllers\Api\V1\DashboardController;
@@ -22,7 +23,9 @@ use App\Http\Controllers\Api\V1\EnrollmentController;
 use App\Http\Controllers\Api\V1\FinanceController;
 use App\Http\Controllers\Api\V1\GlobalSearchController;
 use App\Http\Controllers\Api\V1\GradebookController;
+use App\Http\Controllers\Api\V1\LearningPathController;
 use App\Http\Controllers\Api\V1\LessonController;
+use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\OrganizationController;
 use App\Http\Controllers\Api\V1\PermissionController;
 use App\Http\Controllers\Api\V1\PositionController;
@@ -34,6 +37,7 @@ use App\Http\Controllers\Api\V1\StaffController;
 use App\Http\Controllers\Api\V1\StudentController;
 use App\Http\Controllers\Api\V1\SystemSettingController;
 use App\Http\Controllers\Api\V1\UserController;
+use App\Http\Middleware\EnsureReadOnlyForGuest;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -46,10 +50,12 @@ Route::prefix('v1')->group(function () {
 
     // --- Public Endpoints ---
     Route::post('auth/login', [AuthController::class, 'login']);
+    Route::get('auth/registration-options', [AuthController::class, 'registrationOptions']);
+    Route::post('auth/register-student', [AuthController::class, 'registerStudent']);
     Route::get('public/verify-certificate/{code}', [PublicCertificateVerificationController::class, 'verify']);
 
     // --- Authenticated Endpoints (Sanctum) ---
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', EnsureReadOnlyForGuest::class])->group(function () {
 
         // Auth & Profile
         Route::prefix('auth')->group(function () {
@@ -86,13 +92,15 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('staff', StaffController::class);
         Route::apiResource('students', StudentController::class);
 
-        // Curriculum (Courses, Categories, Modules, Lessons)
+        // Curriculum (Courses, Categories, Paths, Modules, Lessons)
         Route::apiResource('course-categories', CourseCategoryController::class);
+        Route::apiResource('learning-paths', LearningPathController::class);
         Route::post('courses/{course}/modules', [CourseModuleController::class, 'store']);
         Route::post('courses/{course}/units', [CourseUnitController::class, 'store']);
         Route::put('units/{unit}', [CourseUnitController::class, 'update']);
         Route::delete('units/{unit}', [CourseUnitController::class, 'destroy']);
         Route::post('courses/{course}/modules/reorder', [CourseModuleController::class, 'reorder']);
+        Route::patch('courses/{course}/approve', [CourseController::class, 'approve']);
         Route::put('modules/{module}', [CourseModuleController::class, 'update']);
         Route::delete('modules/{module}', [CourseModuleController::class, 'destroy']);
         Route::post('modules/{module}/lessons', [LessonController::class, 'store']);
@@ -105,9 +113,11 @@ Route::prefix('v1')->group(function () {
         Route::post('batches/{batch}/trainers', [CourseBatchController::class, 'assignTrainers']);
         Route::get('batches/{batch}/attendance-matrix', [AttendanceController::class, 'getBatchMatrix']);
         Route::get('batches/{batch}/gradebook', [GradebookController::class, 'show']);
+        Route::post('batches/{batch}/gradebook/mark', [GradebookController::class, 'recordMark']);
         Route::apiResource('batches', CourseBatchController::class);
         Route::patch('enrollments/{enrollment}/status', [EnrollmentController::class, 'updateStatus']);
         Route::patch('enrollments/{enrollment}/workflow', [EnrollmentController::class, 'advanceWorkflow']);
+        Route::post('enrollments/apply', [EnrollmentController::class, 'apply']);
         Route::apiResource('enrollments', EnrollmentController::class);
 
         // Fees, payments and finance clearance
@@ -146,9 +156,20 @@ Route::prefix('v1')->group(function () {
         // Announcements, Audits, Settings & Reports
         Route::apiResource('announcements', AnnouncementController::class);
         Route::get('audit-logs', [AuditLogController::class, 'index']);
+        Route::get('audit-logs/export', [AuditLogController::class, 'exportCsv']);
+        Route::delete('audit-logs', [AuditLogController::class, 'destroy']);
         Route::get('settings', [SystemSettingController::class, 'index']);
         Route::put('settings', [SystemSettingController::class, 'update']);
         Route::get('reports/{type}', [ReportController::class, 'generate']);
         Route::get('reports/{type}/export', [ReportController::class, 'exportCsv']);
+
+        // Notifications Center
+        Route::get('notifications', [NotificationController::class, 'index']);
+        Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+        Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+
+        // Course Feedback & Quality Assurance
+        Route::get('feedbacks', [CourseFeedbackController::class, 'index']);
+        Route::post('feedbacks', [CourseFeedbackController::class, 'store']);
     });
 });

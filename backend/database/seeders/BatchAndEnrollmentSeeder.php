@@ -29,10 +29,7 @@ class BatchAndEnrollmentSeeder extends Seeder
         $courseCcna = Course::where('code', 'CCNA-200-301')->first();
         $courseCyber = Course::where('code', 'CYBER-101')->first();
         $courseBi = Course::where('code', 'BI-300')->first();
-        $courseAccaFia = Course::where('code', 'ACCA-FIA')->first();
-        $courseAccaAppliedKnowledge = Course::where('code', 'ACCA-APPLIED-KNOWLEDGE')->first();
-        $courseAccaAppliedSkills = Course::where('code', 'ACCA-APPLIED-SKILLS')->first();
-        $courseAccaStrategic = Course::where('code', 'ACCA-STRATEGIC-PROFESSIONAL')->first();
+        $courseAcca = Course::where('code', 'ACCA')->first();
 
         $trainerNrb = User::where('email', 'trainer.nairobi@iatlms.test')->first();
         $asstTrainerNrb = User::where('email', 'asst.trainer@iatlms.test')->first();
@@ -106,22 +103,22 @@ class BatchAndEnrollmentSeeder extends Seeder
         ]);
         $batchCyber->trainers()->attach($trainerNrb->id, ['role_type' => 'Lead Trainer']);
 
-        // ACCA cohorts for the four programme stages
+        // ACCA intakes all belong to the single ACCA programme.
         $accaBatches = [
-            [$courseAccaFia, 'ACCA FIA September 2026 Cohort', 'ACCA-FIA-2026-SEP-NRB', '2026-09-14', '2027-03-05', 30],
-            [$courseAccaAppliedKnowledge, 'ACCA Applied Knowledge September 2026 Cohort', 'ACCA-AK-2026-SEP-NRB', '2026-09-14', '2027-01-29', 30],
-            [$courseAccaAppliedSkills, 'ACCA Applied Skills September 2026 Cohort', 'ACCA-AS-2026-SEP-NRB', '2026-09-14', '2027-04-02', 30],
-            [$courseAccaStrategic, 'ACCA Strategic Professional September 2026 Cohort', 'ACCA-SP-2026-SEP-NRB', '2026-09-14', '2027-02-05', 25],
+            ['ACCA FIA September 2026 Intake', 'ACCA-FIA-2026-SEP-NRB', '2026-09-14', '2027-03-05', 30],
+            ['ACCA Applied Knowledge September 2026 Intake', 'ACCA-AK-2026-SEP-NRB', '2026-09-14', '2027-01-29', 30],
+            ['ACCA Applied Skills September 2026 Intake', 'ACCA-AS-2026-SEP-NRB', '2026-09-14', '2027-04-02', 30],
+            ['ACCA Strategic Professional September 2026 Intake', 'ACCA-SP-2026-SEP-NRB', '2026-09-14', '2027-02-05', 25],
         ];
 
-        foreach ($accaBatches as [$course, $name, $code, $startDate, $endDate, $capacity]) {
-            if (! $course) {
+        foreach ($accaBatches as [$name, $code, $startDate, $endDate, $capacity]) {
+            if (! $courseAcca) {
                 continue;
             }
 
             $accaBatch = CourseBatch::create([
                 'organization_id' => $org->id,
-                'course_id' => $course->id,
+                'course_id' => $courseAcca->id,
                 'branch_id' => $branchNrb->id,
                 'name' => $name,
                 'code' => $code,

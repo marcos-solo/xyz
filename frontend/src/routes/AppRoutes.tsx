@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { AppLayout } from '../layouts/AppLayout';
 import { LoginPage } from '../features/auth/pages/LoginPage';
+import { StudentRegistrationPage } from '../features/auth/pages/StudentRegistrationPage';
 import { DashboardPage } from '../features/dashboards/pages/DashboardPage';
 import { UsersListPage } from '../features/users/pages/UsersListPage';
 import { RolesListPage } from '../features/roles/pages/RolesListPage';
@@ -26,6 +27,8 @@ import { ReportsCenterPage } from '../features/reports/pages/ReportsCenterPage';
 import { AnnouncementsPage } from '../features/system/pages/AnnouncementsPage';
 import { AuditLogsPage } from '../features/system/pages/AuditLogsPage';
 import { SystemSettingsPage } from '../features/system/pages/SystemSettingsPage';
+import { GoogleSkillsPlayerPage } from '../features/courses/pages/GoogleSkillsPlayerPage';
+import { StudentCatalogPage } from '../features/courses/pages/StudentCatalogPage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
@@ -50,6 +53,7 @@ export const AppRoutes: React.FC = () => {
     <Routes>
       {/* Public routes */}
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<StudentRegistrationPage />} />
       <Route path="/verify/:code" element={<PublicVerifyPage />} />
 
       {/* Authenticated routes */}
@@ -89,7 +93,19 @@ export const AppRoutes: React.FC = () => {
         <Route path="/assessments/:uuid/take" element={<QuizRunnerPage />} />
         <Route path="/certificates" element={<CertificatesListPage />} />
 
-        {/* Student shortcuts */}
+        {/* Google Skills Learning Player Experience */}
+        <Route path="/learn/:courseUuid" element={<GoogleSkillsPlayerPage />} />
+        <Route path="/learn/:courseUuid/:lessonUuid" element={<GoogleSkillsPlayerPage />} />
+
+        {/* Student shortcuts & Google Skills sidebar routes */}
+        <Route path="/catalog" element={<StudentCatalogPage />} />
+        <Route path="/paths" element={<StudentCatalogPage />} />
+        <Route path="/collections" element={<StudentCatalogPage />} />
+        <Route path="/credentials" element={<CertificatesListPage />} />
+        <Route path="/subscriptions" element={<FinancePage />} />
+        <Route path="/organizations" element={<BranchesListPage />} />
+        <Route path="/programs" element={<BatchesListPage />} />
+
         <Route path="/my-courses" element={<CoursesListPage />} />
         <Route path="/my-assessments" element={<AssessmentsListPage />} />
         <Route path="/my-certificates" element={<CertificatesListPage />} />

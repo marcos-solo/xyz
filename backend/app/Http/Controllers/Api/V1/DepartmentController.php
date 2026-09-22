@@ -7,6 +7,7 @@ use App\Http\Responses\ApiResponse;
 use App\Models\Branch;
 use App\Models\Department;
 use App\Services\AuditLogService;
+use App\Services\BranchScopeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,7 +15,7 @@ class DepartmentController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Department::with('branch');
+        $query = BranchScopeService::apply(Department::with('branch'), $request->user());
 
         if ($request->has('branch_uuid')) {
             $branch = Branch::where('uuid', $request->branch_uuid)->first();
@@ -28,6 +29,7 @@ class DepartmentController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $user = $request->user();
         $request->validate([
             'branch_uuid' => ['nullable', 'exists:branches,uuid'],
             'name' => ['required', 'string', 'max:255'],
@@ -41,6 +43,14 @@ class DepartmentController extends Controller
             if ($branch) {
                 $branchId = $branch->id;
             }
+        }
+
+        if (! BranchScopeService::canAccessAllBranches($user) && $user->branch_id) {
+            if ($branchId && $branchId !== $user->branch_id) {
+                return ApiResponse::forbidden();
+            }
+
+            $branchId = $user->branch_id;
         }
 
         $dept = Department::create([
@@ -58,11 +68,20 @@ class DepartmentController extends Controller
 
     public function show(Department $department): JsonResponse
     {
+        if (! $this->canAccess($department, request()->user())) {
+            return ApiResponse::forbidden();
+        }
+
         return ApiResponse::success($department->load('branch'));
     }
 
     public function update(Request $request, Department $department): JsonResponse
     {
+        $user = $request->user();
+        if (! $this->canAccess($department, $user)) {
+            return ApiResponse::forbidden();
+        }
+
         $request->validate([
             'branch_uuid' => ['nullable', 'exists:branches,uuid'],
             'name' => ['sometimes', 'required', 'string', 'max:255'],
@@ -87,14 +106,24 @@ class DepartmentController extends Controller
             }
         }
 
+        if (! BranchScopeService::canAccessAllBranches($user) && $user->branch_id) {
+            if (array_key_exists('branch_id', $updateData) && $updateData['branch_id'] !== $user->branch_id) {
+                return ApiResponse::forbidden();
+            }
+        }
+
         $department->update($updateData);
         AuditLogService::log('department.update', $department, $old, $department->toArray());
 
         return ApiResponse::success($department->load('branch'), 'Department updated successfully.');
     }
 
-    public function destroy(Department $department): JsonResponse
+    public function destroy(Request $request, Department $department): JsonResponse
     {
+        if (! $this->canAccess($department, $request->user())) {
+            return ApiResponse::forbidden();
+        }
+
         if ($department->users()->exists()) {
             return ApiResponse::error('Cannot delete department with assigned users/staff.', 422);
         }
@@ -103,5 +132,12 @@ class DepartmentController extends Controller
         AuditLogService::log('department.delete', $department);
 
         return ApiResponse::success(null, 'Department deleted successfully.');
+    }
+
+    private function canAccess(Department $department, $user): bool
+    {
+        return BranchScopeService::canAccessAllBranches($user)
+            || ! $user?->branch_id
+            || $department->branch_id === $user->branch_id;
     }
 }

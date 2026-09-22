@@ -2,43 +2,32 @@
 
 namespace App\Services;
 
+use App\Models\Branch;
 use App\Models\Organization;
 use App\Models\StudentProfile;
-use App\Models\SystemSetting;
 use Illuminate\Support\Carbon;
 
 class StudentNumberGeneratorService
 {
-    public static function generate(?int $organizationId = null): string
+    public static function generate(?int $organizationId = null, ?int $branchId = null): string
     {
         $org = $organizationId ? Organization::find($organizationId) : Organization::first();
-        $prefix = $org?->code ?? 'LMS';
+        $branch = $branchId ? Branch::find($branchId) : null;
+        $prefix = 'IAT/'.strtoupper($branch?->code ?? $org?->code ?? 'HQ');
         $year = Carbon::now()->format('Y');
 
-        // Check if there is a custom format setting
-        $customFormat = SystemSetting::where('organization_id', $org?->id)
-            ->where('key', 'student_number_format')
-            ->value('value') ?? '{PREFIX}-{YEAR}-{SEQ:4}';
-
         // Count existing students in the current year to determine sequence
-        $countThisYear = StudentProfile::whereYear('created_at', $year)->count() + 1;
+        $countThisYear = StudentProfile::whereYear('student_profiles.created_at', $year)
+            ->when($branch, fn ($query) => $query->whereHas('user', fn ($userQuery) => $userQuery->where('branch_id', $branch->id)))
+            ->count() + 1;
         $sequence = str_pad((string) $countThisYear, 4, '0', STR_PAD_LEFT);
-
-        $number = str_replace(
-            ['{PREFIX}', '{YEAR}', '{SEQ:4}', '{SEQ:5}'],
-            [$prefix, $year, $sequence, str_pad((string) $countThisYear, 5, '0', STR_PAD_LEFT)],
-            $customFormat
-        );
+        $number = "{$prefix}/{$year}/{$sequence}";
 
         // Ensure uniqueness
         while (StudentProfile::where('student_number', $number)->exists()) {
             $countThisYear++;
             $sequence = str_pad((string) $countThisYear, 4, '0', STR_PAD_LEFT);
-            $number = str_replace(
-                ['{PREFIX}', '{YEAR}', '{SEQ:4}', '{SEQ:5}'],
-                [$prefix, $year, $sequence, str_pad((string) $countThisYear, 5, '0', STR_PAD_LEFT)],
-                $customFormat
-            );
+            $number = "{$prefix}/{$year}/{$sequence}";
         }
 
         return $number;

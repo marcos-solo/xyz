@@ -26,6 +26,7 @@ class Lesson extends Model
         'duration',
         'order',
         'is_preview',
+        'transcript',
         'status',
     ];
 
@@ -35,6 +36,7 @@ class Lesson extends Model
             'is_preview' => 'boolean',
             'duration' => 'integer',
             'order' => 'integer',
+            'transcript' => 'array',
         ];
     }
 

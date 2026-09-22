@@ -34,6 +34,7 @@ export interface User {
   is_student?: boolean;
   student_number?: string;
   employee_number?: string;
+  enrollments?: Enrollment[];
 }
 
 export interface Branch {
@@ -93,6 +94,9 @@ export interface Course {
   name: string;
   short_description?: string;
   description?: string;
+  program_level?: string;
+  entry_requirements?: string;
+  paper_count?: number;
   thumbnail_path?: string;
   duration: number;
   duration_unit: 'hours' | 'days' | 'weeks' | 'months';
@@ -102,9 +106,18 @@ export interface Course {
     uuid: string;
     name: string;
   };
+  learning_path?: {
+    uuid: string;
+    title: string;
+    slug?: string;
+    code?: string;
+  };
+  learning_path_id?: number;
   modules?: CourseModule[];
   units?: CourseUnit[];
   modules_count?: number;
+  all_modules_count?: number;
+  units_count?: number;
   batches_count?: number;
   batches?: CourseBatch[];
   learning_progress?: {
@@ -131,6 +144,28 @@ export interface CourseUnit {
   description?: string;
   order: number;
   modules?: CourseModule[];
+}
+
+export interface LearningPath {
+  id?: number;
+  uuid: string;
+  title: string;
+  slug: string;
+  description?: string;
+  duration: number;
+  duration_unit: 'hours' | 'weeks' | 'months';
+  level: 'Beginner' | 'Intermediate' | 'Advanced' | 'Professional';
+  status: 'draft' | 'active' | 'archived';
+  order: number;
+  category?: {
+    uuid: string;
+    name: string;
+  };
+  courses?: Course[];
+  courses_count?: number;
+  progress_percentage?: number;
+  completed_courses?: number;
+  total_courses?: number;
 }
 
 export interface Lesson {
@@ -186,6 +221,7 @@ export interface StudentProfile {
   emergency_contact_name?: string;
   emergency_contact_phone?: string;
   status: string;
+  created_at?: string;
   user: User;
   guardians?: {
     uuid: string;
@@ -193,10 +229,21 @@ export interface StudentProfile {
     last_name: string;
     phone: string;
     email?: string;
+    address?: string;
+    occupation?: string;
     pivot: {
       relationship: string;
+      is_emergency_contact?: boolean;
+      is_primary_contact?: boolean;
     };
   }[];
+}
+
+export interface StudentStats {
+  total: number;
+  active: number;
+  completed: number;
+  new_this_month: number;
 }
 
 export interface Assessment {

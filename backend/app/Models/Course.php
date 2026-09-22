@@ -17,10 +17,14 @@ class Course extends Model
         'uuid',
         'organization_id',
         'category_id',
+        'learning_path_id',
         'code',
         'name',
         'short_description',
         'description',
+        'program_level',
+        'entry_requirements',
+        'paper_count',
         'thumbnail_path',
         'duration',
         'duration_unit',
@@ -39,6 +43,11 @@ class Course extends Model
         return $this->belongsTo(CourseCategory::class, 'category_id');
     }
 
+    public function learningPath(): BelongsTo
+    {
+        return $this->belongsTo(LearningPath::class, 'learning_path_id');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -47,6 +56,11 @@ class Course extends Model
     public function modules(): HasMany
     {
         return $this->hasMany(CourseModule::class)->whereNull('unit_id')->orderBy('order');
+    }
+
+    public function allModules(): HasMany
+    {
+        return $this->hasMany(CourseModule::class)->orderBy('order');
     }
 
     public function units(): HasMany

@@ -11,6 +11,9 @@ interface AuthContextType {
   hasPermission: (permission: string) => boolean;
   hasRole: (role: string) => boolean;
   updateUser: (updated: Partial<User>) => void;
+  isGuest: boolean;
+  guestPerspective: 'admin' | 'student';
+  setGuestPerspective: (mode: 'admin' | 'student') => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,6 +27,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     () => localStorage.getItem('iat_token')
   );
   const [loading, setLoading] = useState(true);
+  const [guestPerspective, setGuestPerspectiveState] = useState<'admin' | 'student'>(() => {
+    const saved = localStorage.getItem('iat_guest_perspective');
+    return saved === 'student' ? 'student' : 'admin';
+  });
+
+  const isGuest = user?.roles?.includes('Guest') ?? false;
+
+  const setGuestPerspective = (mode: 'admin' | 'student') => {
+    setGuestPerspectiveState(mode);
+    localStorage.setItem('iat_guest_perspective', mode);
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -92,7 +106,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout, hasPermission, hasRole, updateUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        login,
+        logout,
+        hasPermission,
+        hasRole,
+        updateUser,
+        isGuest,
+        guestPerspective,
+        setGuestPerspective,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

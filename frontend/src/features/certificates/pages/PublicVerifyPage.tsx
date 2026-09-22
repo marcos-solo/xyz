@@ -96,7 +96,7 @@ export const PublicVerifyPage: React.FC = () => {
                   <div className="flex items-start gap-3">
                     <Calendar className="h-4 w-4 text-[#73111b] shrink-0 mt-0.5" />
                     <div>
-                      <span className="text-slate-400 font-medium">Issue Date & Cohort:</span>
+                      <span className="text-slate-400 font-medium">Issue Date & Intake:</span>
                       <p className="font-bold text-slate-800">{cert.issue_date} • {cert.cohort_name}</p>
                     </div>
                   </div>

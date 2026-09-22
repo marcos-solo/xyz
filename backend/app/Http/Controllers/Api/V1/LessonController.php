@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
+use App\Models\CourseBatch;
 use App\Models\CourseModule;
 use App\Models\CourseProgress;
 use App\Models\Lesson;
@@ -13,9 +14,15 @@ use Illuminate\Http\Request;
 
 class LessonController extends Controller
 {
+    private function canManageLessons(Request $request): bool
+    {
+        return $request->user()->can('lessons.manage')
+            || $request->user()->hasAnyRole(['Admin', 'Administrator', 'Super Admin', 'CEO']);
+    }
+
     public function store(Request $request, CourseModule $module): JsonResponse
     {
-        if (!$request->user()->can('lessons.manage')) {
+        if (! $this->canManageLessons($request)) {
             return ApiResponse::forbidden();
         }
 
@@ -59,7 +66,7 @@ class LessonController extends Controller
 
     public function update(Request $request, Lesson $lesson): JsonResponse
     {
-        if (!$request->user()->can('lessons.manage')) {
+        if (! $this->canManageLessons($request)) {
             return ApiResponse::forbidden();
         }
 
@@ -87,7 +94,7 @@ class LessonController extends Controller
      */
     public function reorder(Request $request, CourseModule $module): JsonResponse
     {
-        if (!$request->user()->can('lessons.manage')) {
+        if (! $this->canManageLessons($request)) {
             return ApiResponse::forbidden();
         }
 
@@ -117,7 +124,7 @@ class LessonController extends Controller
             'status' => ['required', 'in:in_progress,completed'],
         ]);
 
-        $batch = \App\Models\CourseBatch::where('uuid', $validated['batch_uuid'])->firstOrFail();
+        $batch = CourseBatch::where('uuid', $validated['batch_uuid'])->firstOrFail();
         $lesson->load('module.course');
 
         if ($batch->course_id !== $lesson->module->course_id) {
@@ -127,13 +134,13 @@ class LessonController extends Controller
             ], 403);
         }
 
-        if (!$batch->enrollments()
+        if (! $batch->enrollments()
             ->where('student_id', $user->id)
-            ->whereIn('status', ['Pending', 'Active'])
+            ->whereIn('workflow_stage', ['branch_review', 'finance_cleared', 'in_training', 'course_completed', 'certification_ready', 'certified'])
             ->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => 'You are not enrolled in this course batch.',
+                'message' => 'Admissions must approve your application before learning access is enabled.',
             ], 403);
         }
 
@@ -143,7 +150,7 @@ class LessonController extends Controller
             'batch_id' => $batch->id,
         ]);
 
-        if (!$progress->exists) {
+        if (! $progress->exists) {
             $progress->started_at = now();
         }
 
@@ -156,7 +163,7 @@ class LessonController extends Controller
 
         // Recalculate Course Progress summary
         $course = $lesson->module->course;
-        $totalLessons = Lesson::whereHas('module', fn($q) => $q->where('course_id', $course->id))->count();
+        $totalLessons = Lesson::whereHas('module', fn ($q) => $q->where('course_id', $course->id))->count();
         $completedLessons = LessonProgress::where('user_id', $user->id)
             ->where('batch_id', $batch->id)
             ->where('status', 'completed')
@@ -180,9 +187,14 @@ class LessonController extends Controller
         ], 'Learning progress recorded.');
     }
 
-    public function destroy(Lesson $lesson): JsonResponse
+    public function destroy(Request $request, Lesson $lesson): JsonResponse
     {
+        if (! $this->canManageLessons($request)) {
+            return ApiResponse::forbidden();
+        }
+
         $lesson->delete();
+
         return ApiResponse::success(null, 'Lesson deleted.');
     }
 }

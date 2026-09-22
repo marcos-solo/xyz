@@ -21,16 +21,16 @@ class QuizEngineController extends Controller
     {
         $student = $request->user();
 
-        if (!$student->hasRole('Student')) {
+        if (! $student->hasRole('Student')) {
             return ApiResponse::forbidden('Only students can start an assessment attempt.');
         }
 
         $isEnrolled = $assessment->batch->enrollments()
             ->where('student_id', $student->id)
-            ->whereIn('status', ['Pending', 'Active'])
+            ->whereIn('workflow_stage', ['branch_review', 'finance_cleared', 'in_training', 'course_completed', 'certification_ready', 'certified'])
             ->exists();
-        if (!$isEnrolled) {
-            return ApiResponse::forbidden('You are not enrolled in this assessment cohort.');
+        if (! $isEnrolled) {
+            return ApiResponse::forbidden('Admissions must approve your application before assessment access is enabled.');
         }
 
         // Verify assessment is open
@@ -48,7 +48,7 @@ class QuizEngineController extends Controller
             ->where('status', 'in_progress')
             ->first();
 
-        if (!$activeAttempt) {
+        if (! $activeAttempt) {
             if ($pastAttemptsCount >= $assessment->attempts_allowed) {
                 return ApiResponse::error("You have already used all allowed attempts ({$assessment->attempts_allowed}) for this assessment.", 422);
             }
@@ -83,7 +83,7 @@ class QuizEngineController extends Controller
                 'marks' => (float) $q->marks,
                 'difficulty' => $q->difficulty,
                 'order' => $q->order,
-                'options' => $q->options->map(fn($opt) => [
+                'options' => $q->options->map(fn ($opt) => [
                     'id' => $opt->id,
                     'uuid' => $opt->uuid,
                     'option_text' => $opt->option_text,
@@ -170,7 +170,7 @@ class QuizEngineController extends Controller
                 'total_marks' => (float) $assessment->total_marks,
                 'pass_mark' => (float) $assessment->pass_mark,
             ],
-            'answers' => $attempt->answers->map(fn($ans) => [
+            'answers' => $attempt->answers->map(fn ($ans) => [
                 'question_text' => $ans->question?->question_text,
                 'question_type' => $ans->question?->question_type,
                 'marks_awarded' => (float) $ans->marks_awarded,

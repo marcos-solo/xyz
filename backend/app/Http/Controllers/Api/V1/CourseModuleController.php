@@ -7,7 +7,6 @@ use App\Http\Responses\ApiResponse;
 use App\Models\Course;
 use App\Models\CourseModule;
 use App\Models\CourseUnit;
-use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -21,7 +20,7 @@ class CourseModuleController extends Controller
 
     public function store(Request $request, Course $course): JsonResponse
     {
-        if (!$this->canManageCurriculum($request)) {
+        if (! $this->canManageCurriculum($request)) {
             return ApiResponse::forbidden();
         }
 
@@ -32,7 +31,7 @@ class CourseModuleController extends Controller
             'unit_uuid' => ['nullable', 'exists:course_units,uuid'],
         ]);
 
-        $unit = !empty($validated['unit_uuid'])
+        $unit = ! empty($validated['unit_uuid'])
             ? CourseUnit::where('uuid', $validated['unit_uuid'])->where('course_id', $course->id)->firstOrFail()
             : null;
         $maxOrder = ($unit ? $unit->modules() : $course->modules())->max('order') ?? 0;
@@ -51,7 +50,7 @@ class CourseModuleController extends Controller
 
     public function update(Request $request, CourseModule $module): JsonResponse
     {
-        if (!$this->canManageCurriculum($request)) {
+        if (! $this->canManageCurriculum($request)) {
             return ApiResponse::forbidden();
         }
 
@@ -72,7 +71,7 @@ class CourseModuleController extends Controller
      */
     public function reorder(Request $request, Course $course): JsonResponse
     {
-        if (!$this->canManageCurriculum($request)) {
+        if (! $this->canManageCurriculum($request)) {
             return ApiResponse::forbidden();
         }
 
@@ -93,11 +92,13 @@ class CourseModuleController extends Controller
 
     public function destroy(Request $request, CourseModule $module): JsonResponse
     {
-        if (!$this->canManageCurriculum($request)) {
+        if (! $this->canManageCurriculum($request)) {
             return ApiResponse::forbidden();
         }
 
+        $module->lessons()->delete();
         $module->delete();
+
         return ApiResponse::success(null, 'Module deleted.');
     }
 }

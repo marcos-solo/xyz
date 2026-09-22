@@ -97,7 +97,7 @@ export const EnrollmentsListPage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Student Cohort Enrollments</h1>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Student Intake Enrollments</h1>
           <p className="text-xs text-slate-500">Manage student batch assignments, enrollment numbers, and progress statuses.</p>
         </div>
         {hasPermission('enrollments.create') && (
@@ -114,7 +114,7 @@ export const EnrollmentsListPage: React.FC = () => {
       <Card className="p-4">
         <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
           <select value={courseFilter} onChange={(e) => { setCourseFilter(e.target.value); setPage(1); }} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800"><option value="">All Courses</option>{[...new Map(batches.map((b) => [b.course?.uuid, b.course])).values()].filter(Boolean).map((course: any) => <option key={course.uuid} value={course.uuid}>{course.name}</option>)}</select>
-          <select value={batchFilter} onChange={(e) => { setBatchFilter(e.target.value); setPage(1); }} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800"><option value="">All Cohorts</option>{batches.map((batch) => <option key={batch.uuid} value={batch.uuid}>{batch.name}</option>)}</select>
+          <select value={batchFilter} onChange={(e) => { setBatchFilter(e.target.value); setPage(1); }} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800"><option value="">All Intakes</option>{batches.map((batch) => <option key={batch.uuid} value={batch.uuid}>{batch.name}</option>)}</select>
           <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800"><option value="">All Statuses</option><option value="Pending">Pending</option><option value="Active">Active</option><option value="Completed">Completed</option><option value="Suspended">Suspended</option><option value="Withdrawn">Withdrawn</option></select>
           <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1); }} aria-label="From date" className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800" />
           <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1); }} aria-label="To date" className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800" />
@@ -129,7 +129,7 @@ export const EnrollmentsListPage: React.FC = () => {
               <tr>
                 <th className="py-3.5 px-4">Enrollment #</th>
                 <th className="py-3.5 px-4">Student</th>
-                <th className="py-3.5 px-4">Cohort Batch</th>
+                <th className="py-3.5 px-4">Intake Batch</th>
                 <th className="py-3.5 px-4">Campus</th>
                 <th className="py-3.5 px-4">Date</th>
                 <th className="py-3.5 px-4">Workflow</th>
@@ -166,7 +166,7 @@ export const EnrollmentsListPage: React.FC = () => {
       </Card>
       <Pagination currentPage={pagination.current_page} lastPage={pagination.last_page} total={pagination.total} onPageChange={setPage} />
 
-      <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} title="Enroll Student to Cohort">
+      <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} title="Enroll Student to Intake">
         <form onSubmit={handleEnroll} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Select Student *</label>
@@ -184,14 +184,14 @@ export const EnrollmentsListPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Select Cohort Batch *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Select Intake Batch *</label>
             <select
               required
               value={formData.batch_uuid}
               onChange={(e) => setFormData({ ...formData, batch_uuid: e.target.value })}
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-[#73111b]"
             >
-              <option value="">Select Cohort</option>
+              <option value="">Select Intake</option>
               {batches.map((b) => (
                 <option key={b.uuid} value={b.uuid}>{b.name} ({b.code}) • {b.branch?.name}</option>
               ))}

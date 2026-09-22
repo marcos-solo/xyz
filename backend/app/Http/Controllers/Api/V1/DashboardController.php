@@ -14,6 +14,8 @@ use App\Models\Course;
 use App\Models\CourseBatch;
 use App\Models\CourseProgress;
 use App\Models\Enrollment;
+use App\Models\LearningPath;
+use App\Models\LessonProgress;
 use App\Models\StaffProfile;
 use App\Models\StudentProfile;
 use App\Models\User;
@@ -29,6 +31,10 @@ class DashboardController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
+
+        if ($user->hasRole('Admissions Officer')) {
+            return ApiResponse::forbidden();
+        }
 
         if ($user->hasRole('Student')) {
             return $this->getStudentDashboard($user);
@@ -70,15 +76,23 @@ class DashboardController extends Controller
             'batches_count' => $b->batches_count,
         ]);
 
-        // Monthly Enrollment Trends (Past 6 Months)
-        $enrollmentTrends = [
-            ['month' => 'Apr 2026', 'enrollments' => 28, 'completions' => 22],
-            ['month' => 'May 2026', 'enrollments' => 35, 'completions' => 30],
-            ['month' => 'Jun 2026', 'enrollments' => 42, 'completions' => 38],
-            ['month' => 'Jul 2026', 'enrollments' => 65, 'completions' => 45],
-            ['month' => 'Aug 2026', 'enrollments' => 78, 'completions' => 58],
-            ['month' => 'Sep 2026', 'enrollments' => 84, 'completions' => 62],
-        ];
+        // Monthly admissions and course completions from the enrollment records.
+        $firstMonth = now()->startOfMonth()->subMonths(5);
+        $enrollmentTrends = collect(range(0, 5))->map(function (int $offset) use ($firstMonth): array {
+            $month = $firstMonth->copy()->addMonths($offset);
+
+            return [
+                'month' => $month->format('M Y'),
+                'enrollments' => Enrollment::whereBetween('enrollment_date', [
+                    $month->copy()->startOfMonth()->toDateString(),
+                    $month->copy()->endOfMonth()->toDateString(),
+                ])->count(),
+                'completions' => Enrollment::whereBetween('completion_date', [
+                    $month->copy()->startOfMonth()->toDateString(),
+                    $month->copy()->endOfMonth()->toDateString(),
+                ])->count(),
+            ];
+        })->values();
 
         // Overall Attendance Health
         $totalAttendanceMarks = AttendanceRecord::count();
@@ -214,7 +228,7 @@ class DashboardController extends Controller
     public function getStudentDashboard(User $student): JsonResponse
     {
         $enrollments = Enrollment::where('student_id', $student->id)
-            ->with(['batch.course.modules.lessons', 'batch.trainers'])
+            ->with(['batch.course.modules.lessons', 'batch.trainers', 'finance'])
             ->get();
 
         $courseProgressList = CourseProgress::where('user_id', $student->id)
@@ -224,12 +238,14 @@ class DashboardController extends Controller
         $notifications = $student->unreadNotifications()->latest()->take(5)->get();
 
         $todayClasses = ClassSession::whereIn('batch_id', $enrollments->pluck('batch_id'))
+            ->whereIn('batch_id', $enrollments->whereIn('workflow_stage', ['branch_review', 'finance_cleared', 'in_training', 'course_completed', 'certification_ready', 'certified'])->pluck('batch_id'))
             ->whereDate('date', '>=', Carbon::today())
             ->orderBy('date')
             ->take(3)
             ->get();
 
         $pendingAssessments = Assessment::whereIn('batch_id', $enrollments->pluck('batch_id'))
+            ->whereIn('batch_id', $enrollments->whereIn('workflow_stage', ['branch_review', 'finance_cleared', 'in_training', 'course_completed', 'certification_ready', 'certified'])->pluck('batch_id'))
             ->where('status', 'published')
             ->take(4)
             ->get();
@@ -238,12 +254,182 @@ class DashboardController extends Controller
             ->with(['course', 'batch'])
             ->get();
 
+        // Consecutive daily learning streak calculation (100% real from lesson progress dates)
+        $activityDates = LessonProgress::where('user_id', $student->id)
+            ->whereNotNull('updated_at')
+            ->selectRaw('DATE(updated_at) as act_date')
+            ->groupBy('act_date')
+            ->orderByDesc('act_date')
+            ->pluck('act_date')
+            ->map(fn ($d) => Carbon::parse($d)->toDateString())
+            ->toArray();
+
+        $todayStr = Carbon::today()->toDateString();
+        $yesterdayStr = Carbon::yesterday()->toDateString();
+
+        $currentStreak = 0;
+        $checkDate = null;
+
+        if (in_array($todayStr, $activityDates)) {
+            $checkDate = Carbon::today();
+        } elseif (in_array($yesterdayStr, $activityDates)) {
+            $checkDate = Carbon::yesterday();
+        }
+
+        if ($checkDate) {
+            while (in_array($checkDate->toDateString(), $activityDates)) {
+                $currentStreak++;
+                $checkDate->subDay();
+            }
+        }
+
+        // 7-day streak activity calculation (last 7 days - true if activity occurred)
+        $startOfWeek = Carbon::today()->subDays(6);
+        $recentActivityMap = array_flip($activityDates);
+
+        $streakDays = collect(range(0, 6))->map(function ($dayOffset) use ($startOfWeek, $recentActivityMap) {
+            $date = $startOfWeek->copy()->addDays($dayOffset);
+            $dateKey = $date->toDateString();
+
+            return [
+                'day' => $date->format('D'),
+                'date' => $dateKey,
+                'active' => isset($recentActivityMap[$dateKey]),
+            ];
+        })->values();
+
+        $completedLessonsCount = LessonProgress::where('user_id', $student->id)->where('status', 'completed')->count();
+        $completedCoursesCount = $courseProgressList->where('progress_percentage', '>=', 100)->count();
+        $certificatesCount = Certificate::where('student_id', $student->id)->count();
+        $passedAssessmentsCount = AssignmentSubmission::where('student_id', $student->id)->where('grade', '>=', 70)->count();
+
+        // 100% real XP Points calculation
+        $points = ($completedLessonsCount * 50) + ($passedAssessmentsCount * 150) + ($completedCoursesCount * 500) + ($certificatesCount * 1000) + ($currentStreak * 100);
+
+        $achievements = [
+            [
+                'id' => 'streak_habit',
+                'title' => 'Daily Dedication',
+                'subtitle' => 'Consistent Learning Habit',
+                'description' => 'Maintain an active daily study streak.',
+                'icon' => 'flame',
+                'target' => 7,
+                'current' => $currentStreak,
+                'progress_percentage' => min(100, round(($currentStreak / 7) * 100)),
+                'badge_color' => '#f59e0b',
+            ],
+            [
+                'id' => 'lesson_milestone',
+                'title' => 'Lesson Master',
+                'subtitle' => 'Topic Milestones',
+                'description' => 'Complete 10 lesson lectures, labs, and reading modules.',
+                'icon' => 'award',
+                'target' => 10,
+                'current' => $completedLessonsCount,
+                'progress_percentage' => min(100, round(($completedLessonsCount / 10) * 100)),
+                'badge_color' => '#059669',
+            ],
+            [
+                'id' => 'curriculum_mastery',
+                'title' => 'Curriculum Finisher',
+                'subtitle' => 'Full Course Completion',
+                'description' => 'Reach 100% progress across all modules in an enrolled course.',
+                'icon' => 'book',
+                'target' => 1,
+                'current' => $completedCoursesCount,
+                'progress_percentage' => min(100, round(($completedCoursesCount / 1) * 100)),
+                'badge_color' => '#73111b',
+            ],
+            [
+                'id' => 'iat_certified',
+                'title' => 'IAT Certified',
+                'subtitle' => 'Official Academic Credential',
+                'description' => 'Earn official certified status issued by Institute of Advanced Technology.',
+                'icon' => 'award',
+                'target' => 1,
+                'current' => $certificatesCount,
+                'progress_percentage' => min(100, round(($certificatesCount / 1) * 100)),
+                'badge_color' => '#5c0d15',
+            ],
+        ];
+
+        // Retrieve real Learning Paths and calculate student progress
+        $learningPaths = LearningPath::with(['courses' => function ($q) {
+            $q->where('status', 'active')->with('modules.lessons');
+        }])->where('status', 'active')->orderBy('order')->get()->map(function ($path) use ($student) {
+            $pathCourses = $path->courses;
+            $courseIds = $pathCourses->pluck('id');
+            $progresses = CourseProgress::where('user_id', $student->id)
+                ->whereIn('course_id', $courseIds)
+                ->get();
+            $avgProgress = $pathCourses->count() > 0
+                ? round($progresses->sum('progress_percentage') / $pathCourses->count(), 1)
+                : 0;
+
+            return [
+                'uuid' => $path->uuid,
+                'title' => $path->title,
+                'slug' => $path->slug,
+                'description' => $path->description,
+                'level' => $path->level,
+                'duration' => $path->duration,
+                'duration_unit' => $path->duration_unit,
+                'courses_count' => $pathCourses->count(),
+                'progress_percentage' => (float) $avgProgress,
+                'courses' => $pathCourses->map(fn ($c) => [
+                    'uuid' => $c->uuid,
+                    'code' => $c->code,
+                    'name' => $c->name,
+                    'level' => $c->level,
+                    'duration' => $c->duration.' '.$c->duration_unit,
+                    'first_lesson_uuid' => $c->modules->first()?->lessons->first()?->uuid,
+                ]),
+            ];
+        });
+
+        // Retrieve catalog courses for Google Skills view
+        $allActiveCourses = Course::where('status', 'active')
+            ->with(['category', 'learningPath', 'modules.lessons'])
+            ->get();
+
+        $featuredActivities = $allActiveCourses->map(function ($c) use ($student) {
+            $progress = CourseProgress::where('user_id', $student->id)->where('course_id', $c->id)->first();
+            $totalDurationHours = max(1, round($c->duration * ($c->duration_unit === 'weeks' ? 4 : 1)));
+
+            return [
+                'uuid' => $c->uuid,
+                'code' => $c->code,
+                'title' => $c->name,
+                'short_description' => $c->short_description ?: $c->description,
+                'type' => 'Course',
+                'learning_path' => $c->learningPath ? [
+                    'uuid' => $c->learningPath->uuid,
+                    'title' => $c->learningPath->title,
+                    'name' => $c->learningPath->title,
+                    'slug' => $c->learningPath->slug,
+                ] : null,
+                'is_featured' => true,
+                'duration_text' => "{$totalDurationHours} hrs",
+                'progress_percentage' => $progress ? (float) $progress->progress_percentage : 0,
+                'modules_count' => $c->modules->count(),
+                'first_lesson_uuid' => $c->modules->first()?->lessons->first()?->uuid,
+            ];
+        });
+
         return ApiResponse::success([
             'student' => [
                 'full_name' => $student->full_name,
                 'student_number' => $student->studentProfile?->student_number,
                 'admission_date' => $student->studentProfile?->admission_date?->format('Y-m-d'),
             ],
+            'gamification' => [
+                'points' => $points,
+                'current_streak' => $currentStreak,
+                'streak_days' => $streakDays,
+                'achievements' => $achievements,
+            ],
+            'learning_paths' => $learningPaths,
+            'activities' => $featuredActivities,
             'enrollments' => $enrollments->map(fn ($e) => [
                 'uuid' => $e->uuid,
                 'enrollment_number' => $e->enrollment_number,
@@ -252,6 +438,7 @@ class DashboardController extends Controller
                 'status' => $e->status,
                 'workflow_stage' => $e->workflow_stage,
                 'workflow_updated_at' => $e->workflow_updated_at?->toIso8601String(),
+                'finance_status' => $e->finance?->status ?? 'pending',
                 'final_grade' => $e->final_grade,
                 'final_score' => $e->final_score,
                 'start_date' => $e->batch?->start_date?->format('Y-m-d'),
@@ -310,6 +497,7 @@ class DashboardController extends Controller
                 'course_name' => $e->batch?->course?->name,
                 'stage' => $e->workflow_stage,
                 'status' => $e->status,
+                'finance_status' => $e->finance?->status ?? 'pending',
             ]),
             'notifications' => $notifications->map(fn ($notification) => [
                 'id' => $notification->id,

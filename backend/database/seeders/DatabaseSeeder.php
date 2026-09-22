@@ -16,6 +16,8 @@ class DatabaseSeeder extends Seeder
             BatchAndEnrollmentSeeder::class,
             AssessmentAndGradingSeeder::class,
             CertificateSeeder::class,
+            LearningPathSeeder::class,
+            AccaTimetableAndEnrollmentSeeder::class,
         ]);
     }
 }

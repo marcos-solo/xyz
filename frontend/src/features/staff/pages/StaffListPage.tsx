@@ -284,7 +284,7 @@ export const StaffListPage: React.FC = () => {
             <div className="text-xs text-rose-800">
               <p className="font-bold">Are you sure you want to archive this staff record?</p>
               <p className="mt-1">
-                Archiving <strong>{selectedStaff?.user?.full_name}</strong> will deactivate their account and remove trainer cohort assignments.
+                Archiving <strong>{selectedStaff?.user?.full_name}</strong> will deactivate their account and remove trainer intake assignments.
               </p>
             </div>
           </div>

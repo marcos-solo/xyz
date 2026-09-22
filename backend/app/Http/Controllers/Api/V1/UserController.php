@@ -29,14 +29,14 @@ class UserController extends Controller
     public function index(Request $request): JsonResponse
     {
         $authUser = $request->user();
-        if (!$authUser->can('users.view')) {
+        if (! $authUser->can('users.view')) {
             return ApiResponse::forbidden();
         }
 
         $query = User::with(['branch', 'department', 'position', 'roles', 'staffProfile', 'studentProfile']);
 
         // Branch-level data isolation
-        if (!BranchScopeService::canAccessAllBranches($authUser) && $authUser->branch_id) {
+        if (! BranchScopeService::canAccessAllBranches($authUser) && $authUser->branch_id) {
             $query->where('branch_id', $authUser->branch_id);
         } elseif ($request->filled('branch_uuid')) {
             $branch = Branch::where('uuid', $request->branch_uuid)->first();
@@ -50,11 +50,11 @@ class UserController extends Controller
             $term = $request->search;
             $query->where(function ($q) use ($term) {
                 $q->where('first_name', 'like', "%{$term}%")
-                  ->orWhere('last_name', 'like', "%{$term}%")
-                  ->orWhere('email', 'like', "%{$term}%")
-                  ->orWhere('phone', 'like', "%{$term}%")
-                  ->orWhereHas('studentProfile', fn($sq) => $sq->where('student_number', 'like', "%{$term}%"))
-                  ->orWhereHas('staffProfile', fn($sq) => $sq->where('employee_number', 'like', "%{$term}%"));
+                    ->orWhere('last_name', 'like', "%{$term}%")
+                    ->orWhere('email', 'like', "%{$term}%")
+                    ->orWhere('phone', 'like', "%{$term}%")
+                    ->orWhereHas('studentProfile', fn ($sq) => $sq->where('student_number', 'like', "%{$term}%"))
+                    ->orWhereHas('staffProfile', fn ($sq) => $sq->where('employee_number', 'like', "%{$term}%"));
             });
         }
 
@@ -90,7 +90,7 @@ class UserController extends Controller
     public function store(Request $request): JsonResponse
     {
         $authUser = $request->user();
-        if (!$authUser->can('users.create')) {
+        if (! $authUser->can('users.create')) {
             return ApiResponse::forbidden();
         }
 
@@ -123,9 +123,9 @@ class UserController extends Controller
         ]);
 
         $org = Organization::first();
-        $branch = !empty($validated['branch_uuid']) ? Branch::where('uuid', $validated['branch_uuid'])->first() : null;
-        $department = !empty($validated['department_uuid']) ? Department::where('uuid', $validated['department_uuid'])->first() : null;
-        $position = !empty($validated['position_uuid']) ? Position::where('uuid', $validated['position_uuid'])->first() : null;
+        $branch = ! empty($validated['branch_uuid']) ? Branch::where('uuid', $validated['branch_uuid'])->first() : null;
+        $department = ! empty($validated['department_uuid']) ? Department::where('uuid', $validated['department_uuid'])->first() : null;
+        $position = ! empty($validated['position_uuid']) ? Position::where('uuid', $validated['position_uuid'])->first() : null;
 
         $temporaryPassword = $validated['password'] ?? Str::random(12);
 
@@ -153,7 +153,7 @@ class UserController extends Controller
             if ($isStaffRole || ($validated['user_type'] ?? '') === 'staff') {
                 StaffProfile::create([
                     'user_id' => $user->id,
-                    'employee_number' => $validated['employee_number'] ?? 'EMP-' . str_pad((string) $user->id, 4, '0', STR_PAD_LEFT),
+                    'employee_number' => $validated['employee_number'] ?? 'EMP-'.str_pad((string) $user->id, 4, '0', STR_PAD_LEFT),
                     'employment_date' => now()->format('Y-m-d'),
                     'job_title' => $validated['job_title'] ?? $position?->name ?? 'Staff Member',
                     'status' => 'active',
@@ -162,7 +162,7 @@ class UserController extends Controller
 
             // Create Student Profile if role is Student
             if (in_array('Student', $validated['roles']) || ($validated['user_type'] ?? '') === 'student') {
-                $studentNumber = $validated['student_number'] ?? StudentNumberGeneratorService::generate($org->id);
+                $studentNumber = $validated['student_number'] ?? StudentNumberGeneratorService::generate($org->id, $branch?->id);
                 StudentProfile::create([
                     'user_id' => $user->id,
                     'student_number' => $studentNumber,
@@ -203,7 +203,7 @@ class UserController extends Controller
     public function update(Request $request, User $user): JsonResponse
     {
         $authUser = $request->user();
-        if (!$authUser->can('users.update')) {
+        if (! $authUser->can('users.update')) {
             return ApiResponse::forbidden();
         }
 
@@ -236,9 +236,9 @@ class UserController extends Controller
         $user->fill(collect($validated)->except(['branch_uuid', 'department_uuid', 'position_uuid', 'roles'])->toArray());
         $user->save();
 
-        if (!empty($validated['roles']) && $authUser->can('users.manage-roles')) {
+        if (! empty($validated['roles']) && $authUser->can('users.manage-roles')) {
             // Protect last Super Admin from having role stripped
-            if ($user->hasRole('Super Admin') && !in_array('Super Admin', $validated['roles'])) {
+            if ($user->hasRole('Super Admin') && ! in_array('Super Admin', $validated['roles'])) {
                 $superAdminCount = User::role('Super Admin')->count();
                 if ($superAdminCount <= 1) {
                     return ApiResponse::error('Cannot revoke Super Admin role from the last remaining system administrator.', 422);
@@ -261,7 +261,7 @@ class UserController extends Controller
     public function updateStatus(Request $request, User $user): JsonResponse
     {
         $authUser = $request->user();
-        if (!$authUser->can('users.update')) {
+        if (! $authUser->can('users.update')) {
             return ApiResponse::forbidden();
         }
 
@@ -288,7 +288,7 @@ class UserController extends Controller
     public function resetPassword(Request $request, User $user): JsonResponse
     {
         $authUser = $request->user();
-        if (!$authUser->can('users.update')) {
+        if (! $authUser->can('users.update')) {
             return ApiResponse::forbidden();
         }
 
@@ -310,7 +310,7 @@ class UserController extends Controller
     public function destroy(Request $request, User $user): JsonResponse
     {
         $authUser = $request->user();
-        if (!$authUser->can('users.delete')) {
+        if (! $authUser->can('users.delete')) {
             return ApiResponse::forbidden();
         }
 

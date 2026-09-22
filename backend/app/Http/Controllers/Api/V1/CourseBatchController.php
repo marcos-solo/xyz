@@ -8,7 +8,6 @@ use App\Models\Branch;
 use App\Models\Course;
 use App\Models\CourseBatch;
 use App\Models\Organization;
-use App\Models\User;
 use App\Services\AuditLogService;
 use App\Services\BranchScopeService;
 use Illuminate\Http\JsonResponse;
@@ -19,7 +18,7 @@ class CourseBatchController extends Controller
     public function index(Request $request): JsonResponse
     {
         $authUser = $request->user();
-        if (!$authUser->can('batches.view')) {
+        if (! $authUser->can('batches.view')) {
             return ApiResponse::forbidden();
         }
 
@@ -27,7 +26,7 @@ class CourseBatchController extends Controller
             ->withCount(['enrollments', 'classSessions', 'assessments']);
 
         // Branch Isolation
-        if (!BranchScopeService::canAccessAllBranches($authUser) && $authUser->branch_id) {
+        if (! BranchScopeService::canAccessAllBranches($authUser) && $authUser->branch_id) {
             $query->where('branch_id', $authUser->branch_id);
         } elseif ($request->filled('branch_uuid')) {
             $branch = Branch::where('uuid', $request->branch_uuid)->first();
@@ -37,8 +36,8 @@ class CourseBatchController extends Controller
         }
 
         // Trainer limitation (if only regular trainer)
-        if ($authUser->hasRole('Trainer') && !$authUser->can('batches.view-all-branches') && !$authUser->hasRole('Branch Manager')) {
-            $query->whereHas('batchTrainers', fn($bt) => $bt->where('trainer_id', $authUser->id));
+        if ($authUser->hasRole('Trainer') && ! $authUser->can('batches.view-all-branches') && ! $authUser->hasRole('Branch Manager')) {
+            $query->whereHas('batchTrainers', fn ($bt) => $bt->where('trainer_id', $authUser->id));
         }
 
         if ($request->filled('course_uuid')) {
@@ -46,6 +45,10 @@ class CourseBatchController extends Controller
             if ($course) {
                 $query->where('course_id', $course->id);
             }
+        }
+
+        if ($request->filled('category_uuid')) {
+            $query->whereHas('course.category', fn ($categoryQuery) => $categoryQuery->where('uuid', $request->category_uuid));
         }
 
         if ($request->filled('status')) {
@@ -74,7 +77,7 @@ class CourseBatchController extends Controller
     public function store(Request $request): JsonResponse
     {
         $authUser = $request->user();
-        if (!$authUser->can('batches.create')) {
+        if (! $authUser->can('batches.create')) {
             return ApiResponse::forbidden();
         }
 
@@ -108,7 +111,7 @@ class CourseBatchController extends Controller
             'status' => $validated['status'] ?? 'upcoming',
         ]);
 
-        if (!empty($validated['trainer_ids'])) {
+        if (! empty($validated['trainer_ids'])) {
             foreach ($validated['trainer_ids'] as $idx => $trainerId) {
                 $batch->trainers()->attach($trainerId, [
                     'role_type' => $idx === 0 ? 'Lead Trainer' : 'Assistant Trainer',
@@ -136,11 +139,13 @@ class CourseBatchController extends Controller
     public function update(Request $request, CourseBatch $batch): JsonResponse
     {
         $authUser = $request->user();
-        if (!$authUser->can('batches.update')) {
+        if (! $authUser->can('batches.update')) {
             return ApiResponse::forbidden();
         }
 
         $validated = $request->validate([
+            'course_uuid' => ['sometimes', 'required', 'exists:courses,uuid'],
+            'branch_uuid' => ['sometimes', 'required', 'exists:branches,uuid'],
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'code' => ['sometimes', 'required', 'string', 'max:50'],
             'start_date' => ['sometimes', 'required', 'date'],
@@ -150,7 +155,16 @@ class CourseBatchController extends Controller
         ]);
 
         $old = $batch->toArray();
-        $batch->update($validated);
+
+        if (array_key_exists('course_uuid', $validated)) {
+            $batch->course_id = Course::where('uuid', $validated['course_uuid'])->value('id');
+        }
+        if (array_key_exists('branch_uuid', $validated)) {
+            $batch->branch_id = Branch::where('uuid', $validated['branch_uuid'])->value('id');
+        }
+
+        $batch->fill(collect($validated)->except(['course_uuid', 'branch_uuid'])->toArray());
+        $batch->save();
 
         AuditLogService::log('batch.update', $batch, $old, $batch->toArray());
 
@@ -163,7 +177,7 @@ class CourseBatchController extends Controller
     public function assignTrainers(Request $request, CourseBatch $batch): JsonResponse
     {
         $authUser = $request->user();
-        if (!$authUser->can('batches.assign-trainers')) {
+        if (! $authUser->can('batches.assign-trainers')) {
             return ApiResponse::forbidden();
         }
 
