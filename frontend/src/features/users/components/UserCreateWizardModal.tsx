@@ -267,7 +267,7 @@ export const UserCreateWizardModal: React.FC<UserCreateWizardModalProps> = ({ is
               type="text"
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              placeholder="e.g. Password123!"
+              placeholder="Leave blank to auto-generate"
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-[#73111b]"
             />
           </div>

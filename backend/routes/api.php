@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\CourseBatchController;
 use App\Http\Controllers\Api\V1\CourseCategoryController;
 use App\Http\Controllers\Api\V1\CourseController;
 use App\Http\Controllers\Api\V1\CourseFeedbackController;
+use App\Http\Controllers\Api\V1\CourseModuleCommentController;
 use App\Http\Controllers\Api\V1\CourseModuleController;
 use App\Http\Controllers\Api\V1\CourseUnitController;
 use App\Http\Controllers\Api\V1\DashboardController;
@@ -96,6 +97,8 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('course-categories', CourseCategoryController::class);
         Route::apiResource('learning-paths', LearningPathController::class);
         Route::post('courses/{course}/modules', [CourseModuleController::class, 'store']);
+        Route::get('modules/{module}/comments', [CourseModuleCommentController::class, 'index']);
+        Route::post('modules/{module}/comments', [CourseModuleCommentController::class, 'store']);
         Route::post('courses/{course}/units', [CourseUnitController::class, 'store']);
         Route::put('units/{unit}', [CourseUnitController::class, 'update']);
         Route::delete('units/{unit}', [CourseUnitController::class, 'destroy']);
@@ -106,6 +109,7 @@ Route::prefix('v1')->group(function () {
         Route::post('modules/{module}/lessons', [LessonController::class, 'store']);
         Route::post('modules/{module}/lessons/reorder', [LessonController::class, 'reorder']);
         Route::post('lessons/{lesson}/progress', [LessonController::class, 'updateProgress']);
+        Route::post('lessons/videos/upload', [LessonController::class, 'uploadVideo']);
         Route::apiResource('lessons', LessonController::class)->except(['index', 'store']);
         Route::apiResource('courses', CourseController::class);
 
@@ -128,6 +132,8 @@ Route::prefix('v1')->group(function () {
         // Class Timetable & Attendance
         Route::get('class-sessions/{classSession}/attendance', [AttendanceController::class, 'getSessionRoster']);
         Route::post('class-sessions/{classSession}/attendance', [AttendanceController::class, 'recordAttendance']);
+        Route::post('class-sessions/batch-schedule', [ClassSessionController::class, 'batchStore']);
+        Route::post('class-sessions/check-conflicts', [ClassSessionController::class, 'checkConflicts']);
         Route::apiResource('class-sessions', ClassSessionController::class);
 
         // Assessments & Question Bank

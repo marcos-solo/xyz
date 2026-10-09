@@ -226,6 +226,7 @@ class CourseController extends Controller
             'modules.lessons.resources',
             'units.modules.lessons.resources',
             'batches.branch',
+            'batches.trainers',
             'creator',
         ]);
 
@@ -234,39 +235,64 @@ class CourseController extends Controller
                 ->whereHas('enrollments', fn ($q) => $q
                     ->where('student_id', $authUser->id)
                     ->whereIn('workflow_stage', ['branch_review', 'finance_cleared', 'in_training', 'course_completed', 'certification_ready', 'certified']))
-                ->with('branch')
+                ->with(['branch', 'trainers'])
                 ->get());
 
             $studentBatch = $course->batches->first();
             $courseCategoryName = strtolower((string) ($course->category?->name ?? ''));
 
-            if ($courseCategoryName === 'acca' && $studentBatch) {
+            if ($courseCategoryName === 'acca' && $studentBatch && ! request()->boolean('all_units')) {
                 $batchName = strtolower($studentBatch->name);
-                $unitMatchMap = [
-                    'Foundation / FIA' => ['foundation', 'fia'],
-                    'Applied Knowledge' => ['applied knowledge', 'applied-knowledge', 'ak'],
-                    'Applied Skills' => ['applied skills', 'applied-skills', 'as'],
-                    'Strategic Professional' => ['strategic professional', 'strategic-professional', 'sp'],
-                ];
 
                 $matchedUnitTitle = null;
-                foreach ($unitMatchMap as $unitTitle => $keywords) {
-                    foreach ($keywords as $keyword) {
-                        if (str_contains($batchName, $keyword)) {
-                            $matchedUnitTitle = $unitTitle;
-                            break 2;
-                        }
-                    }
+                $matchedModuleKeyword = null;
+
+                if (str_contains($batchName, 'knowledge') || str_contains($batchName, 'ak')) {
+                    $matchedUnitTitle = 'Fundamental Level';
+                    $matchedModuleKeyword = 'Applied Knowledge';
+                } elseif (str_contains($batchName, 'skill') || str_contains($batchName, 'as')) {
+                    $matchedUnitTitle = 'Fundamental Level';
+                    $matchedModuleKeyword = 'Applied Skills';
+                } elseif (str_contains($batchName, 'fundamental')) {
+                    $matchedUnitTitle = 'Fundamental Level';
+                } elseif (str_contains($batchName, 'strategic') || str_contains($batchName, 'sp')) {
+                    $matchedUnitTitle = 'Strategic Professional Level';
+                } elseif (str_contains($batchName, 'foundation') || str_contains($batchName, 'fia')) {
+                    $matchedUnitTitle = 'Foundation Level';
                 }
 
                 if ($matchedUnitTitle) {
                     $filteredUnits = $course->units
-                        ->filter(fn ($unit) => strtolower(trim((string) $unit->title)) === strtolower(trim($matchedUnitTitle)))
+                        ->filter(fn ($unit) => str_contains(strtolower((string) $unit->title), strtolower($matchedUnitTitle)))
                         ->values();
+
+                    if ($filteredUnits->isEmpty() && $matchedModuleKeyword) {
+                        $filteredUnits = $course->units
+                            ->filter(fn ($unit) => str_contains(strtolower((string) $unit->title), strtolower($matchedModuleKeyword)))
+                            ->values();
+                    }
+
+                    if ($matchedModuleKeyword && $filteredUnits->isNotEmpty()) {
+                        foreach ($filteredUnits as $unit) {
+                            $filteredModules = $unit->modules
+                                ->filter(fn ($m) => str_contains(strtolower((string) $m->title), strtolower($matchedModuleKeyword)))
+                                ->values();
+                            $unit->setRelation('modules', $filteredModules);
+                        }
+                    }
 
                     $course->setRelation('units', $filteredUnits);
                     $course->setRelation('modules', $course->modules
-                        ->filter(fn ($module) => $filteredUnits->contains('id', $module->unit_id))
+                        ->filter(function ($module) use ($filteredUnits, $matchedModuleKeyword) {
+                            if (! $filteredUnits->contains('id', $module->unit_id)) {
+                                return false;
+                            }
+                            if ($matchedModuleKeyword) {
+                                return str_contains(strtolower((string) $module->title), strtolower($matchedModuleKeyword));
+                            }
+
+                            return true;
+                        })
                         ->values());
                 }
             }

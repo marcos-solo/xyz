@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
+    private const PRIVACY_NOTICE_VERSION = '2026-09-30';
+
     public function registrationOptions(): JsonResponse
     {
         $courses = Course::query()
@@ -47,6 +49,7 @@ class AuthController extends Controller
             'email' => ['required', 'email', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:50'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'privacy_notice_accepted' => ['required', 'accepted'],
             'course_uuid' => ['required', 'exists:courses,uuid'],
             'batch_uuid' => ['required', 'exists:course_batches,uuid'],
         ]);
@@ -57,7 +60,6 @@ class AuthController extends Controller
         $batch = CourseBatch::where('uuid', $validated['batch_uuid'])
             ->where('course_id', $course->id)
             ->whereIn('status', ['upcoming', 'ongoing'])
-            ->lockForUpdate()
             ->first();
 
         if (! $batch) {
@@ -71,25 +73,26 @@ class AuthController extends Controller
             return ApiResponse::error('The selected intake is full. Please choose another intake.', 422);
         }
 
-        $organization = Organization::find($batch->organization_id);
-        $student = DB::transaction(function () use ($validated, $organization, $batch) {
+        $email = strtolower($validated['email']);
+        $organization = Organization::findOrFail($batch->organization_id);
+        $student = DB::transaction(function () use ($validated, $organization, $batch, $email): User {
             $user = User::create([
                 'first_name' => $validated['first_name'],
                 'last_name' => $validated['last_name'],
-                'email' => $validated['email'],
+                'email' => $email,
                 'phone' => $validated['phone'] ?? null,
                 'password' => Hash::make($validated['password']),
                 'organization_id' => $organization->id,
                 'branch_id' => $batch->branch_id,
                 'status' => 'active',
-                'email_verified_at' => now(),
+                'privacy_notice_accepted_at' => now(),
+                'privacy_notice_version' => self::PRIVACY_NOTICE_VERSION,
             ]);
             $user->assignRole('Student');
 
-            $studentNumber = StudentNumberGeneratorService::generate($organization->id, $batch->branch_id);
             StudentProfile::create([
                 'user_id' => $user->id,
-                'student_number' => $studentNumber,
+                'student_number' => StudentNumberGeneratorService::generate($organization->id, $batch->branch_id),
                 'admission_date' => now()->toDateString(),
                 'status' => 'active',
             ]);
@@ -101,7 +104,6 @@ class AuthController extends Controller
                 'enrollment_date' => now()->toDateString(),
                 'status' => 'Pending',
                 'workflow_stage' => 'registered',
-                'workflow_updated_by' => null,
                 'workflow_updated_at' => now(),
             ]);
             EnrollmentFinance::create([
@@ -112,12 +114,11 @@ class AuthController extends Controller
             return $user->load(['organization', 'branch', 'roles.permissions', 'studentProfile']);
         });
 
-        $token = $student->createToken('auth_token')->plainTextToken;
-
         AuditLogService::log('student.self_register', $student, null, [
             'course_uuid' => $course->uuid,
             'batch_uuid' => $batch->uuid,
         ]);
+        $token = $student->createToken('auth_token')->plainTextToken;
 
         return ApiResponse::success([
             'token' => $token,

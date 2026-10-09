@@ -21,6 +21,10 @@ import {
   CheckCircle2,
   Bell,
   FileText,
+  Trophy,
+  Mail,
+  Clock3,
+  UserRound,
 } from 'lucide-react';
 
 interface ActivityItem {
@@ -73,12 +77,46 @@ interface AchievementItem {
   badge_color: string;
 }
 
+interface CourseTimelineStep {
+  type: string;
+  title: string;
+  coverage: string | null;
+  start_date: string;
+  end_date: string;
+  is_estimate: boolean;
+  status: 'past' | 'current' | 'upcoming';
+}
+
+interface StudentEnrollment {
+  uuid: string;
+  batch_name: string;
+  course_name: string;
+  status: string;
+  workflow_stage: string;
+  start_date: string | null;
+  end_date: string | null;
+  progress_percentage: number;
+  trainers?: { uuid: string; name: string; email?: string; phone?: string; role?: string }[];
+  course_timeline: CourseTimelineStep[];
+}
+
+const formatScheduleDate = (value?: string | null) => {
+  if (!value) return 'Date pending';
+  const date = new Date(`${value}T12:00:00`);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+};
+
 export const GoogleSkillsDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState<any>(null);
+  const [communityUrl, setCommunityUrl] = useState('');
+  const [academicSupportEmail, setAcademicSupportEmail] = useState('');
+  const [queryResponseTime, setQueryResponseTime] = useState('Within 2 business days');
   const [activeTab, setActiveTab] = useState<'activities' | 'paths' | 'academic'>('activities');
   const [achievementsModalOpen, setAchievementsModalOpen] = useState(false);
   const [portalNotifications, setPortalNotifications] = useState<any[]>([]);
@@ -108,6 +146,17 @@ export const GoogleSkillsDashboard: React.FC = () => {
       }
     };
     fetchDashboard();
+  }, []);
+
+  useEffect(() => {
+    api.get('/organization')
+      .then((response) => {
+        const organization = response.data.data;
+        setCommunityUrl(organization?.settings?.learning_community_url || '');
+        setAcademicSupportEmail(organization?.settings?.academic_support_email || organization?.email || '');
+        setQueryResponseTime(organization?.settings?.query_response_time || 'Within 2 business days');
+      })
+      .catch((err) => console.error('Failed to load community link:', err));
   }, []);
 
   const dismissNotification = async (id: string) => {
@@ -177,6 +226,15 @@ export const GoogleSkillsDashboard: React.FC = () => {
   // Real IAT courses from dashboard API
   const activities: ActivityItem[] = dashboardData?.activities || [];
   const learningPaths: LearningPathItem[] = dashboardData?.learning_paths || [];
+  const enrollments: StudentEnrollment[] = dashboardData?.enrollments || [];
+  const latestEnrollment = [...enrollments].sort((first, second) =>
+    (second.start_date || '').localeCompare(first.start_date || ''),
+  );
+  const coursePlanEnrollment =
+    latestEnrollment.find((enrollment) => enrollment.workflow_stage === 'in_training') ||
+    latestEnrollment.find((enrollment) => ['registered', 'branch_review', 'finance_cleared'].includes(enrollment.workflow_stage)) ||
+    latestEnrollment.find((enrollment) => enrollment.status === 'Active') ||
+    latestEnrollment[0];
 
   const handleLaunchActivity = (activity: ActivityItem) => {
     navigate(`/learn/${activity.uuid}`);
@@ -289,6 +347,192 @@ export const GoogleSkillsDashboard: React.FC = () => {
           </button>
         </div>
       </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white shadow-2xs">
+        <div className="flex flex-col gap-2 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2.5">
+            <Calendar className="h-4 w-4 text-[#73111b]" />
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">My course plan</h2>
+              <p className="text-[11px] text-slate-500">Course progress against your intake dates, from onboarding to mock exam.</p>
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-400">Coverage windows are planned across the batch period.</p>
+        </div>
+
+        {coursePlanEnrollment ? (() => {
+          const enrollment = coursePlanEnrollment;
+          const progress = Math.min(100, Math.max(0, enrollment.progress_percentage || 0));
+          const timeline = enrollment.course_timeline || [];
+          const currentStepIndex = Math.max(0, timeline.findIndex((step) => step.status === 'current'));
+          const progressStepIndex = timeline.length > 0
+            ? Math.min(timeline.length - 1, Math.floor((progress / 100) * timeline.length))
+            : -1;
+
+          return (
+            <details key={enrollment.uuid} open className="group border-b border-slate-100 last:border-b-0">
+              <summary className="flex cursor-pointer list-none flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between [&::-webkit-details-marker]:hidden">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-bold text-slate-900">{enrollment.course_name}</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    {enrollment.batch_name} · {formatScheduleDate(enrollment.start_date)} – {formatScheduleDate(enrollment.end_date)}
+                  </p>
+                </div>
+                <div className="flex w-full items-center gap-3 sm:w-64">
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full rounded-full bg-[#73111b] transition-[width]" style={{ width: `${progress}%` }} />
+                  </div>
+                  <span className="w-10 text-right font-mono text-[11px] font-bold text-[#73111b]">{Math.round(progress)}%</span>
+                </div>
+              </summary>
+
+              {timeline.length > 0 ? (
+                <div className="px-5 pb-5 pt-2">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">Your route to the mock exam</p>
+                      <p className="mt-0.5 text-[10px] text-slate-500">Each step is a scheduled stage in your intake.</p>
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-bold text-[#73111b]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#73111b]" />
+                      {Math.round(progress)}% along the course
+                    </span>
+                  </div>
+
+                  <ol className="grid grid-cols-2 items-end gap-x-2 gap-y-0 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                    {timeline.map((step, stepIndex) => {
+                      const isPast = step.status === 'past';
+                      const isCurrent = step.status === 'current';
+                      const isProgressMarker = stepIndex === progressStepIndex;
+                      const stairHeight = 52 + ((stepIndex % 3) * 22);
+
+                      return (
+                        <li key={`${step.type}-${stepIndex}`} className="relative min-w-0 pt-5" style={{ minHeight: `${stairHeight + 188}px` }}>
+                          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center">
+                            <div className="relative z-10 mb-2 flex min-h-24 w-full flex-col justify-end px-1 text-center">
+                              {isProgressMarker && (
+                                <span className="mx-auto mb-1 rounded-full bg-[#73111b] px-2 py-0.5 text-[9px] font-black uppercase text-white shadow-sm">
+                                  You are here
+                                </span>
+                              )}
+                              <p className="line-clamp-2 text-[10px] font-bold leading-tight text-slate-800 sm:text-[11px]">{step.title}</p>
+                              <p className="mt-1 text-[9px] leading-tight text-slate-500">
+                                {formatScheduleDate(step.start_date)}
+                                {step.end_date !== step.start_date ? ` – ${formatScheduleDate(step.end_date)}` : ''}
+                              </p>
+                              {step.coverage && <p className="mt-1 line-clamp-2 text-[9px] leading-tight text-slate-400">{step.coverage}</p>}
+                              {step.type === 'mock_exam' && step.is_estimate && <span className="mt-1 text-[8px] font-bold text-amber-700">Date to confirm</span>}
+                            </div>
+                            <div
+                              className={`relative flex w-full items-start justify-center border-x border-t px-2 pt-2 ${
+                                isPast
+                                  ? 'border-emerald-700 bg-emerald-600 text-white'
+                                  : isCurrent
+                                    ? 'border-[#73111b] bg-[#73111b] text-white shadow-[0_0_0_3px_rgba(115,17,27,0.12)]'
+                                    : 'border-slate-300 bg-slate-100 text-slate-500'
+                              }`}
+                              style={{ height: `${stairHeight}px` }}
+                            >
+                              {isCurrent ? (
+                                <span className="absolute -top-3 h-3 w-3 rotate-45 border-l-2 border-t-2 border-[#73111b] bg-white" />
+                              ) : null}
+                              <span className="text-[9px] font-black tabular-nums">{String(stepIndex + 1).padStart(2, '0')}</span>
+                              {isPast && <CheckCircle2 className="ml-1 h-3 w-3" />}
+                              {isCurrent && <span className="ml-1 text-[8px] font-bold uppercase">Current</span>}
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                    <li className="relative flex min-h-60 flex-col items-center justify-end pb-2">
+                      <div className="mb-2 text-center">
+                        <p className="text-[10px] font-black uppercase text-amber-700">Goal</p>
+                        <p className="text-[10px] font-bold text-slate-800">Qualification</p>
+                      </div>
+                      <div className={`flex h-16 w-16 items-center justify-center rounded-full border-2 ${progress >= 100 ? 'border-amber-500 bg-amber-100 text-amber-600' : 'border-amber-200 bg-amber-50 text-amber-500'}`}>
+                        <Trophy className="h-8 w-8" />
+                      </div>
+                      <div className={`mt-2 h-12 w-full border-x border-t ${progress >= 100 ? 'border-amber-600 bg-amber-500' : 'border-amber-300 bg-amber-100'}`} />
+                    </li>
+                  </ol>
+
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-[10px] text-slate-500">
+                    <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-600" /> Completed stage</span>
+                    <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[#73111b]" /> Current stage {timeline[currentStepIndex]?.title ? `· ${timeline[currentStepIndex].title}` : ''}</span>
+                    <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-slate-200" /> Upcoming stage</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="px-5 pb-5 text-xs text-slate-500">Course dates or curriculum coverage have not been published for this intake yet.</p>
+              )}
+            </details>
+          );
+        })() : (
+          <div className="flex flex-col gap-3 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-slate-500">Your course plan will appear here after you join an intake.</p>
+            <button type="button" onClick={() => navigate('/catalog')} className="self-start text-xs font-bold text-[#73111b] hover:underline sm:self-auto">
+              Browse courses
+            </button>
+          </div>
+        )}
+      </section>
+
+      {coursePlanEnrollment && (
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-2xs" aria-labelledby="student-support-title">
+          <div className="flex flex-col gap-2 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2.5">
+              <MessageSquare className="h-4 w-4 text-[#73111b]" />
+              <div>
+                <h2 id="student-support-title" className="text-sm font-bold text-slate-900">Who to contact</h2>
+                <p className="text-[11px] text-slate-500">Choose the right route for your course question.</p>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
+              <Clock3 className="h-3.5 w-3.5 text-[#73111b]" />
+              Expected reply: {queryResponseTime}
+            </span>
+          </div>
+          <div className="grid gap-0 divide-y divide-slate-100 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+            <div className="p-5">
+              <p className="text-xs font-bold text-slate-800">Lecture questions</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">Ask about a lecture, lesson notes, or something explained in class in that module’s private discussion. Your assigned trainer can see it.</p>
+              <div className="mt-3 space-y-2">
+                {coursePlanEnrollment.trainers?.length ? coursePlanEnrollment.trainers.map((trainer) => (
+                  <div key={trainer.uuid} className="flex min-w-0 items-center gap-2 text-xs">
+                    <UserRound className="h-4 w-4 shrink-0 text-[#73111b]" />
+                    <span className="truncate font-semibold text-slate-700">{trainer.name}{trainer.role ? ` · ${trainer.role}` : ''}</span>
+                    {trainer.email && <a className="ml-auto inline-flex shrink-0 items-center gap-1 font-bold text-[#73111b] hover:underline" href={`mailto:${trainer.email}`}><Mail className="h-3.5 w-3.5" />Email</a>}
+                    {!trainer.email && trainer.phone && <a className="ml-auto shrink-0 font-bold text-[#73111b] hover:underline" href={`tel:${trainer.phone}`}>Call</a>}
+                  </div>
+                )) : <p className="text-[11px] text-slate-500">Open a lesson and use its Module discussion to reach your trainer.</p>}
+              </div>
+            </div>
+            <div className="p-5">
+              <p className="text-xs font-bold text-slate-800">Syllabus & exam preparation</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">For syllabus coverage, exam technique, revision planning, or mock-exam preparation, contact Academic Support.</p>
+              {academicSupportEmail ? (
+                <a href={`mailto:${academicSupportEmail}`} className="mt-3 inline-flex max-w-full items-center gap-2 text-xs font-bold text-[#73111b] hover:underline">
+                  <Mail className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{academicSupportEmail}</span>
+                </a>
+              ) : <p className="mt-3 text-[11px] font-semibold text-slate-600">Contact your assigned trainer through the module discussion.</p>}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {communityUrl && (
+        <a
+          href={communityUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-800"
+        >
+          <MessageSquare className="h-4 w-4" />
+          Online learning community
+          <ArrowRight className="h-3.5 w-3.5" />
+        </a>
+      )}
 
       {/* 2. Main Content & Right Gamification Column (Google Skills Structure) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -507,7 +751,14 @@ export const GoogleSkillsDashboard: React.FC = () => {
                     <Calendar className="h-4 w-4 text-[#73111b]" />
                     <span>Scheduled Class Lectures & Labs</span>
                   </h3>
-                  <span className="text-xs text-slate-400">Campus & Virtual</span>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/timetable')}
+                    className="text-xs font-bold text-[#73111b] hover:text-[#5c0d15] flex items-center gap-1 transition"
+                  >
+                    <span>View Full Timetable</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
                 </div>
 
                 <div className="space-y-3">
@@ -515,12 +766,20 @@ export const GoogleSkillsDashboard: React.FC = () => {
                     dashboardData.upcoming_classes.map((cls: any, i: number) => (
                       <div
                         key={i}
-                        className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 hover:border-slate-300 transition"
                       >
-                        <div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#fff1f2] text-[#73111b] border border-[#fecdd3]">
+                              {cls.delivery_mode || 'Online'}
+                            </span>
+                            <span className="text-xs font-mono font-bold text-slate-500">
+                              {cls.start_time?.slice(0, 5)} - {cls.end_time?.slice(0, 5)}
+                            </span>
+                          </div>
                           <p className="text-xs font-bold text-slate-900">{cls.title}</p>
-                          <p className="text-[11px] text-slate-500 mt-0.5">
-                            {cls.date} • {cls.start_time} - {cls.end_time} • {cls.delivery_mode}
+                          <p className="text-[11px] text-slate-500">
+                            {cls.date} • {cls.batch?.name || cls.location || 'IAT Virtual Campus'}
                           </p>
                         </div>
                         {cls.meeting_url && (
@@ -528,17 +787,26 @@ export const GoogleSkillsDashboard: React.FC = () => {
                             href={cls.meeting_url}
                             target="_blank"
                             rel="noreferrer"
-                            className="px-3.5 py-1.5 rounded-xl bg-[#73111b] hover:bg-[#5c0d15] text-white text-xs font-bold transition shadow-xs"
+                            className="shrink-0 px-4 py-2 rounded-xl bg-[#73111b] hover:bg-[#5c0d15] text-white text-xs font-bold transition shadow-xs text-center"
                           >
-                            Join Session
+                            Join Live Meet
                           </a>
                         )}
                       </div>
                     ))
                   ) : (
-                    <p className="text-xs text-slate-400 py-6 text-center">
-                      No live lecture sessions scheduled today. You are free for self-paced study!
-                    </p>
+                    <div className="py-8 text-center space-y-2">
+                      <p className="text-xs text-slate-400">
+                        No live lecture sessions scheduled for today.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/timetable')}
+                        className="text-xs font-bold text-[#73111b] hover:underline"
+                      >
+                        Browse Weekly Timetable →
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

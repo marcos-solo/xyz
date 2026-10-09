@@ -4,16 +4,65 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\ApiResponse;
+use App\Models\Course;
 use App\Models\CourseBatch;
-use App\Models\CourseModule;
 use App\Models\CourseProgress;
 use App\Models\Lesson;
 use App\Models\LessonProgress;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 
 class LessonController extends Controller
 {
+    private function batchModules(Course $course, CourseBatch $batch): Collection
+    {
+        $modules = $course->units()
+            ->with(['modules.lessons', 'modules.unit'])
+            ->orderBy('order')
+            ->get()
+            ->flatMap(fn ($unit) => $unit->modules->sortBy('order')->values())
+            ->merge($course->modules()->with('lessons')->orderBy('order')->get());
+
+        $batchName = strtolower($batch->name);
+        $unitTitle = null;
+        $moduleKeyword = null;
+
+        if (str_contains($batchName, 'knowledge') || str_contains($batchName, ' ak')) {
+            $unitTitle = 'Fundamental Level';
+            $moduleKeyword = 'Applied Knowledge';
+        } elseif (str_contains($batchName, 'skill') || str_contains($batchName, ' as')) {
+            $unitTitle = 'Fundamental Level';
+            $moduleKeyword = 'Applied Skills';
+        } elseif (str_contains($batchName, 'fundamental')) {
+            $unitTitle = 'Fundamental Level';
+        } elseif (str_contains($batchName, 'strategic') || str_contains($batchName, ' sp')) {
+            $unitTitle = 'Strategic Professional Level';
+        } elseif (str_contains($batchName, 'foundation') || str_contains($batchName, 'fia')) {
+            $unitTitle = 'Foundation Level';
+        }
+
+        if ($unitTitle) {
+            $modules = $modules->filter(function ($module) use ($unitTitle, $moduleKeyword): bool {
+                $matchesUnit = str_contains(strtolower((string) $module->unit?->title), strtolower($unitTitle));
+                $matchesModule = ! $moduleKeyword || str_contains(strtolower($module->title), strtolower($moduleKeyword));
+
+                return $matchesUnit && $matchesModule;
+            })->values();
+        }
+
+        if ($batch->curriculum_lesson_uuids) {
+            $curriculumLessonUuids = $batch->curriculum_lesson_uuids;
+            $modules->each(fn ($module) => $module->setRelation(
+                'lessons',
+                $module->lessons->whereIn('uuid', $curriculumLessonUuids)->values()
+            ));
+        }
+
+        return $modules->values();
+    }
+
     private function canManageLessons(Request $request): bool
     {
         return $request->user()->can('lessons.manage')
@@ -89,6 +138,24 @@ class LessonController extends Controller
         return ApiResponse::success($lesson, 'Lesson updated successfully.');
     }
 
+    public function uploadVideo(Request $request): JsonResponse
+    {
+        if (! $this->canManageLessons($request)) {
+            return ApiResponse::forbidden();
+        }
+
+        $validated = $request->validate([
+            'video' => ['required', 'file', 'mimetypes:video/mp4,video/webm,video/ogg,video/quicktime', 'max:512000'],
+        ]);
+
+        $path = $validated['video']->store('lesson-videos', 'public');
+
+        return ApiResponse::success([
+            'video_url' => Storage::disk('public')->url($path),
+            'file_path' => $path,
+        ], 'Video uploaded successfully.', 201);
+    }
+
     /**
      * Drag-and-drop reorder lessons within a module.
      */
@@ -144,6 +211,25 @@ class LessonController extends Controller
             ], 403);
         }
 
+        $course = $lesson->module->course;
+        $modules = $this->batchModules($course, $batch);
+        $modulePosition = $modules->search(fn ($module) => $module->id === $lesson->module_id);
+        $includedLessonIds = $modules->flatMap(fn ($module) => $module->lessons->pluck('id'));
+        if ($modulePosition === false || ! $includedLessonIds->contains($lesson->id)) {
+            return ApiResponse::error('This lesson is not part of the selected intake curriculum.', 422);
+        }
+
+        $previousLessonIds = $modules->take($modulePosition)->flatMap(fn ($module) => $module->lessons->pluck('id'));
+        $completedPreviousLessons = LessonProgress::where('user_id', $user->id)
+            ->where('batch_id', $batch->id)
+            ->where('status', 'completed')
+            ->whereIn('lesson_id', $previousLessonIds)
+            ->count();
+
+        if ($completedPreviousLessons < $previousLessonIds->count()) {
+            return ApiResponse::error('Complete the previous module before moving on.', 422);
+        }
+
         $progress = LessonProgress::firstOrNew([
             'user_id' => $user->id,
             'lesson_id' => $lesson->id,
@@ -162,11 +248,13 @@ class LessonController extends Controller
         $progress->save();
 
         // Recalculate Course Progress summary
-        $course = $lesson->module->course;
-        $totalLessons = Lesson::whereHas('module', fn ($q) => $q->where('course_id', $course->id))->count();
+        $curriculumModules = $this->batchModules($course, $batch);
+        $curriculumLessonIds = $curriculumModules->flatMap(fn ($module) => $module->lessons->pluck('id'))->unique();
+        $totalLessons = $curriculumLessonIds->count();
         $completedLessons = LessonProgress::where('user_id', $user->id)
             ->where('batch_id', $batch->id)
             ->where('status', 'completed')
+            ->whereIn('lesson_id', $curriculumLessonIds)
             ->count();
 
         $percentage = $totalLessons > 0 ? round(($completedLessons / $totalLessons) * 100, 2) : 0;

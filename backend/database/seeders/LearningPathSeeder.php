@@ -31,66 +31,55 @@ class LearningPathSeeder extends Seeder
                 'course_codes' => ['ACCA'],
             ],
             [
-                'title' => 'Enterprise Network Engineering & Infrastructure Track',
-                'slug' => 'enterprise-network-engineering-infrastructure-track',
-                'category_slug' => 'networking-infrastructure',
-                'description' => 'Comprehensive pathway covering enterprise network architecture, Cisco routing and switching protocols, VLAN management, and secure perimeter infrastructure.',
+                'title' => 'Foundation in Accountancy (FIA) Fast-Track',
+                'slug' => 'foundation-in-accountancy-fia-track',
+                'category_slug' => 'acca',
+                'description' => 'Entry-level pathway covering RQF Level 2 to 4 papers (FA1, MA1, FA2, MA2, FBT, FMA, FFA), ideal for school leavers and aspiring accountants.',
                 'duration' => 120,
-                'duration_unit' => 'hours',
-                'level' => 'Intermediate',
-                'status' => 'active',
-                'order' => 2,
-                'course_codes' => ['CCNA-200-301'],
-            ],
-            [
-                'title' => 'Cybersecurity Operations & Threat Defense Track',
-                'slug' => 'cybersecurity-operations-threat-defense-track',
-                'category_slug' => 'cybersecurity-defense',
-                'description' => 'End-to-end security operations track covering network vulnerability analysis, cryptographic safeguards, penetration testing, and defensive incident response.',
-                'duration' => 80,
                 'duration_unit' => 'hours',
                 'level' => 'Beginner',
                 'status' => 'active',
-                'order' => 3,
-                'course_codes' => ['CYBER-101'],
+                'order' => 2,
+                'course_codes' => ['ACCA'],
             ],
             [
-                'title' => 'Business Intelligence & Data Analytics Track',
-                'slug' => 'business-intelligence-data-analytics-track',
-                'category_slug' => 'data-analytics-ai',
-                'description' => 'Practical pathway for data analysts and business decision-makers using Power BI, DAX modeling, automated ETL pipelines, and executive dashboards.',
-                'duration' => 60,
+                'title' => 'ACCA Applied Skills & CBE Preparation Track',
+                'slug' => 'acca-applied-skills-cbe-track',
+                'category_slug' => 'acca',
+                'description' => 'Advanced technical practice covering Corporate Law, Performance Management, Taxation, Financial Reporting, Audit & Assurance, and Financial Management.',
+                'duration' => 180,
                 'duration_unit' => 'hours',
                 'level' => 'Intermediate',
                 'status' => 'active',
-                'order' => 4,
-                'course_codes' => ['BI-300'],
+                'order' => 3,
+                'course_codes' => ['ACCA'],
             ],
         ];
 
-        foreach ($pathsData as $p) {
-            $category = CourseCategory::where('slug', $p['category_slug'])->first();
+        foreach ($pathsData as $pData) {
+            $cat = CourseCategory::where('slug', $pData['category_slug'])->first();
+            if (! $cat) {
+                continue;
+            }
 
-            $path = LearningPath::updateOrCreate(
-                ['slug' => $p['slug']],
+            $learningPath = LearningPath::updateOrCreate(
+                ['slug' => $pData['slug'], 'organization_id' => $org->id],
                 [
-                    'organization_id' => $org->id,
-                    'category_id' => $category?->id,
-                    'title' => $p['title'],
-                    'description' => $p['description'],
-                    'duration' => $p['duration'],
-                    'duration_unit' => $p['duration_unit'],
-                    'level' => $p['level'],
-                    'status' => $p['status'],
-                    'order' => $p['order'],
+                    'category_id' => $cat->id,
+                    'title' => $pData['title'],
+                    'description' => $pData['description'],
+                    'duration' => $pData['duration'],
+                    'duration_unit' => $pData['duration_unit'],
+                    'level' => $pData['level'],
+                    'status' => $pData['status'],
+                    'order' => $pData['order'],
                 ]
             );
 
-            // Link courses to this learning path
-            foreach ($p['course_codes'] as $courseCode) {
-                Course::where('code', $courseCode)->update([
-                    'learning_path_id' => $path->id,
-                ]);
+            // Associate ACCA course
+            $courses = Course::whereIn('code', $pData['course_codes'])->get();
+            foreach ($courses as $c) {
+                $c->update(['learning_path_id' => $learningPath->id]);
             }
         }
     }

@@ -11,11 +11,27 @@ import {
   AlertCircle,
   Phone,
   Globe,
+  BookOpen,
+  GraduationCap,
+  ClipboardCheck,
+  WalletCards,
+  FileCheck2,
+  UserRound,
+  X,
 } from 'lucide-react';
 
+const registrationStages = [
+  { step: '06', title: 'Onboard & begin learning', icon: GraduationCap, width: '58%', color: 'bg-[#73111b]' },
+  { step: '05', title: 'Complete finance clearance', icon: WalletCards, width: '68%', color: 'bg-[#a52a35]' },
+  { step: '04', title: 'Admissions reviews your application', icon: ClipboardCheck, width: '78%', color: 'bg-[#c44b3f]' },
+  { step: '03', title: 'Submit your application', icon: FileCheck2, width: '88%', color: 'bg-[#d97732]' },
+  { step: '02', title: 'Create your student account', icon: UserRound, width: '96%', color: 'bg-[#397c70]' },
+  { step: '01', title: 'Choose a course & intake', icon: BookOpen, width: '100%', color: 'bg-[#315d73]' },
+];
+
 export const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('superadmin@iatlms.test');
-  const [password, setPassword] = useState('Password123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -41,16 +57,11 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const handleQuickLogin = (roleEmail: string) => {
-    setEmail(roleEmail);
-    setPassword('Password123!');
-  };
-
   return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-2 sm:p-4 lg:p-6">
-      <div className="w-full max-w-[1340px] lg:grid lg:grid-cols-[1.38fr_1fr] min-h-[760px] bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
+      <div className="relative w-full max-w-[1340px] lg:grid lg:grid-cols-[1.38fr_1fr] min-h-[760px] bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
         {/* Left Side: Authentic ACCA Red Flyer-Faithful Code Design */}
-        <div className="hidden lg:flex relative flex-col justify-between bg-[#cc0015] text-white overflow-hidden select-none">
+        <div className="hidden lg:flex relative flex-col justify-start bg-[#cc0015] text-white overflow-hidden select-none">
           {/* Subtle geometric background curve */}
           <div className="absolute top-0 right-0 w-[55%] h-full bg-[#bd0012] rounded-l-[160px] pointer-events-none opacity-40" />
 
@@ -81,7 +92,7 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {/* Middle Hero: Headline + Circular Student Frame + Speech Bubble */}
-          <div className="grid grid-cols-[1.05fr_0.95fr] gap-4 items-center px-6 xl:px-8 py-2 relative z-10 my-auto">
+          <div className="grid grid-cols-[1.05fr_0.95fr] gap-4 items-center px-6 xl:px-8 py-2 relative z-10 mt-6">
             {/* Left: Bold Typography */}
             <div className="space-y-3.5 pr-2">
               <h2 className="text-2xl xl:text-3xl font-black text-white uppercase tracking-tight leading-[1.12]">
@@ -123,10 +134,10 @@ export const LoginPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Bottom: The 3 Curriculum Columns */}
-          <div className="px-6 xl:px-8 pt-3 pb-4 relative z-10">
+          {/* Bottom: ACCA qualification levels */}
+          <div className="px-6 xl:px-8 pt-3 pb-4 mt-6 relative z-10">
             <div className="grid grid-cols-3 gap-3 pt-3.5 border-t border-white/25 text-white">
-              {/* Column 1: APPLIED KNOWLEDGE */}
+              {/* Foundation Level */}
               <div className="space-y-2">
                 <div className="flex items-center gap-1.5">
                   <div className="w-5 h-5 rounded-full border-2 border-white flex items-center justify-center shrink-0">
@@ -135,17 +146,16 @@ export const LoginPage: React.FC = () => {
                     </svg>
                   </div>
                   <h4 className="text-[11px] xl:text-xs font-black uppercase tracking-wider leading-tight">
-                    APPLIED KNOWLEDGE
+                    FOUNDATION LEVEL
                   </h4>
                 </div>
                 <ul className="text-[10px] xl:text-[11px] text-white/95 space-y-1 pl-6 list-disc font-medium">
-                  <li>Business & Technology</li>
-                  <li>Financial Accounting</li>
-                  <li>Management Accounting</li>
+                  <li>FA1, MA1, FA2, MA2</li>
+                  <li>FBT, FMA, FFA</li>
                 </ul>
               </div>
 
-              {/* Column 2: APPLIED SKILLS */}
+              {/* Fundamental Level with its two modules */}
               <div className="space-y-2">
                 <div className="flex items-center gap-1.5">
                   <div className="w-5 h-5 rounded-full border-2 border-white flex items-center justify-center shrink-0">
@@ -154,16 +164,25 @@ export const LoginPage: React.FC = () => {
                     </svg>
                   </div>
                   <h4 className="text-[11px] xl:text-xs font-black uppercase tracking-wider leading-tight">
-                    APPLIED SKILLS
+                    FUNDAMENTAL LEVEL
                   </h4>
                 </div>
-                <ul className="text-[10px] xl:text-[11px] text-white/95 space-y-0.5 pl-6 list-disc font-medium">
-                  <li>Taxation</li>
-                  <li>Performance Management</li>
-                  <li>Audit & Assurance</li>
-                  <li>Corporate & Business Law</li>
-                  <li>Financial Reporting</li>
-                  <li>Financial Management</li>
+                <ul className="text-[10px] xl:text-[11px] text-white/95 space-y-2 pl-6 font-medium">
+                  <li>
+                    <span className="font-black text-amber-200">Applied Knowledge Module</span>
+                    <ul className="mt-0.5 list-disc space-y-0.5 pl-3 text-white/90">
+                      <li>Business & Technology</li>
+                      <li>Financial Accounting</li>
+                      <li>Management Accounting</li>
+                    </ul>
+                  </li>
+                  <li>
+                    <span className="font-black text-amber-200">Applied Skills Module</span>
+                    <ul className="mt-0.5 list-disc space-y-0.5 pl-3 text-white/90">
+                      <li>Law, Performance, Taxation</li>
+                      <li>Reporting, Audit, Finance</li>
+                    </ul>
+                  </li>
                 </ul>
               </div>
 
@@ -176,7 +195,7 @@ export const LoginPage: React.FC = () => {
                     </svg>
                   </div>
                   <h4 className="text-[11px] xl:text-xs font-black uppercase tracking-wider leading-tight">
-                    STRATEGIC PROFESSIONAL
+                    STRATEGIC PROFESSIONAL LEVEL
                   </h4>
                 </div>
                 <ul className="text-[10px] xl:text-[11px] text-white/95 space-y-0.5 pl-6 list-disc font-medium">
@@ -197,7 +216,7 @@ export const LoginPage: React.FC = () => {
           </div>
 
           {/* Bottom White Contact Strip */}
-          <div className="bg-white py-3 px-6 xl:px-8 flex items-center justify-between text-slate-800 border-t border-slate-200 relative z-10">
+          <div className="bg-white py-3 px-6 xl:px-8 flex items-center justify-between text-slate-800 border-t border-slate-200 relative z-10 mt-auto">
             <a
               href="tel:0723819257"
               className="hover:text-[#cc0015] transition-colors flex items-center gap-2 group"
@@ -299,82 +318,72 @@ export const LoginPage: React.FC = () => {
               Apply for admission
             </a>
           </p>
+          <p className="mt-2 text-center text-[10px] leading-relaxed text-slate-500">
+            Student registration includes a privacy acknowledgment under Kenya's Data Protection Act, 2019 and applicable data protection requirements.
+          </p>
 
-          {/* Quick demo switchers */}
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5 text-center">
-              Quick Role Demonstration
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('ceo@iatlms.test')}
-                className="col-span-2 p-2.5 rounded-xl bg-[#fff1f2] hover:bg-[#ffe4e6] border border-[#fecdd3] text-left transition flex items-center justify-between"
-              >
-                <div>
-                  <p className="text-xs font-black text-[#73111b]">👑 Chief Executive Officer (CEO)</p>
-                  <p className="text-[10px] text-slate-600 font-medium">ceo@iat.ac.ke • Multi-Branch Global Oversight</p>
+          <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <summary className="cursor-pointer text-xs font-bold text-slate-700 marker:text-[#73111b]">
+              Student registration guide
+            </summary>
+            <div
+              className="absolute inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4"
+              onClick={(event) => {
+                if (event.target === event.currentTarget) {
+                  event.currentTarget.closest('details')?.removeAttribute('open');
+                }
+              }}
+            >
+              <section role="dialog" aria-modal="true" aria-label="Student registration guide" className="max-h-full w-full max-w-xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-7">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-sm font-black text-slate-900">Your IAT journey</h2>
+                    <p className="mt-1 text-[11px] text-slate-500">Build your next step, one stage at a time.</p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Close registration guide"
+                    onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}
+                    className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-800"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-                <span className="px-2 py-0.5 rounded-md bg-[#73111b] text-white text-[10px] font-bold">All Branches</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('guest@iatlms.test')}
-                className="col-span-2 p-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200 text-left transition flex items-center justify-between"
-              >
-                <div>
-                  <p className="text-xs font-black text-indigo-900 flex items-center gap-1.5">
-                    <span>👁️</span>
-                    <span>Guest Account (Read-Only Testing)</span>
-                  </p>
-                  <p className="text-[10px] text-slate-600 font-medium">
-                    guest@iatlms.test • View all users, records & student portal (no edits)
+                <div className="mx-auto mt-5 flex w-full max-w-md flex-col items-center gap-0.5" aria-label="IAT student registration pathway, from choosing a course to onboarding">
+                  {registrationStages.map((stage) => {
+                    const StageIcon = stage.icon;
+
+                    return (
+                      <div
+                        key={stage.step}
+                        className={`flex min-h-11 items-center justify-center gap-2 px-3 text-center text-white shadow-sm ${stage.color}`}
+                        style={{ width: stage.width, clipPath: 'polygon(9% 0, 91% 0, 100% 100%, 0 100%)' }}
+                      >
+                        <StageIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <span className="text-[10px] font-black tabular-nums text-white/75">{stage.step}</span>
+                        <span className="text-[10px] font-bold leading-tight sm:text-[11px]">{stage.title}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-5 flex flex-col items-center gap-3">
+                  <a href="/register" className="inline-flex items-center gap-1.5 rounded-lg bg-[#73111b] px-3.5 py-2 text-[11px] font-bold text-white transition hover:bg-[#5c0d15]">
+                    Start your application <ArrowRight className="h-3.5 w-3.5" />
+                  </a>
+                  <p className="border-t border-slate-200 pt-3 text-center text-[11px] leading-relaxed text-slate-500">
+                    Entry qualifications and supporting documents vary by course. Confirm the current requirements with IAT Admissions before applying.
                   </p>
                 </div>
-                <span className="px-2 py-0.5 rounded-md bg-indigo-700 text-white text-[10px] font-bold">
-                  Guest Mode
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('superadmin@iatlms.test')}
-                className="p-2.5 rounded-xl bg-slate-50 hover:bg-[#fff1f2] border border-slate-200 hover:border-[#fecdd3] text-left transition"
-              >
-                <p className="text-[11px] font-bold text-[#73111b]">Super Admin</p>
-                <p className="text-[10px] text-slate-500 truncate">superadmin@iat.ac.ke</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('bm.embu@iatlms.test')}
-                className="p-2.5 rounded-xl bg-slate-50 hover:bg-[#fff1f2] border border-slate-200 hover:border-[#fecdd3] text-left transition"
-              >
-                <p className="text-[11px] font-bold text-[#73111b]">Branch Manager</p>
-                <p className="text-[10px] text-slate-500 truncate">bm.embu@iat.ac.ke</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('trainer.nairobi@iatlms.test')}
-                className="p-2.5 rounded-xl bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 text-left transition"
-              >
-                <p className="text-[11px] font-bold text-emerald-700">Lead Trainer</p>
-                <p className="text-[10px] text-slate-500 truncate">trainer.nairobi@...</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('student.john@iatlms.test')}
-                className="p-2.5 rounded-xl bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-200 text-left transition"
-              >
-                <p className="text-[11px] font-bold text-amber-700">Student (John)</p>
-                <p className="text-[10px] text-slate-500 truncate">student.john@...</p>
-              </button>
+              </section>
             </div>
-          </div>
+          </details>
+
         </div>
 
         {/* Public Certificate Verification Link */}
         <div className="text-center mt-6">
           <a
-            href="/verify/IAT-CCNA-98234"
+            href="/verify"
             className="text-xs text-slate-600 hover:text-[#73111b] font-semibold transition inline-flex items-center gap-1.5"
           >
             <ShieldCheck className="h-4 w-4 text-[#73111b]" />

@@ -4,8 +4,6 @@ import { IatLogo } from '../common/IatLogo';
 import {
   Menu,
   Search,
-  Star,
-  Flame,
   HelpCircle,
   Globe,
   LogOut,
@@ -20,14 +18,10 @@ import { NotificationCenterDropdown } from './NotificationCenterDropdown';
 
 interface GoogleSkillsNavbarProps {
   onOpenMobileSidebar: () => void;
-  points?: number;
-  streak?: number;
 }
 
 export const GoogleSkillsNavbar: React.FC<GoogleSkillsNavbarProps> = ({
   onOpenMobileSidebar,
-  points = 10405,
-  streak = 3,
 }) => {
   const { user, logout } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -76,24 +70,6 @@ export const GoogleSkillsNavbar: React.FC<GoogleSkillsNavbarProps> = ({
           >
             <Search className="h-4 w-4" />
           </button>
-
-          {/* Points / XP badge */}
-          <div
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50/90 border border-amber-200/90 text-amber-900 font-semibold text-xs cursor-default select-none shadow-2xs"
-            title="Learning Experience Points"
-          >
-            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
-            <span className="tracking-tight">{points.toLocaleString()}</span>
-          </div>
-
-          {/* Daily Streak badge */}
-          <div
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#fff1f2] border border-[#fecdd3] text-[#881337] font-semibold text-xs cursor-default select-none shadow-2xs"
-            title="Current Daily Streak"
-          >
-            <Flame className="h-3.5 w-3.5 fill-[#73111b] text-[#73111b]" />
-            <span>{streak}</span>
-          </div>
 
           {/* Help button */}
           <button

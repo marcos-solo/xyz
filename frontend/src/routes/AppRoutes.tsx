@@ -54,6 +54,7 @@ export const AppRoutes: React.FC = () => {
       {/* Public routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<StudentRegistrationPage />} />
+      <Route path="/verify" element={<PublicVerifyPage />} />
       <Route path="/verify/:code" element={<PublicVerifyPage />} />
 
       {/* Authenticated routes */}

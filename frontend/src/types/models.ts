@@ -188,6 +188,7 @@ export interface CourseBatch {
   code: string;
   start_date: string;
   end_date: string;
+  curriculum_lesson_uuids?: string[] | null;
   capacity: number;
   status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
   course?: Course;

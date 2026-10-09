@@ -6,6 +6,7 @@ use App\Models\CertificateTemplate;
 use App\Models\Course;
 use App\Models\CourseBatch;
 use App\Models\Enrollment;
+use App\Models\Organization;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -54,16 +55,53 @@ class AuthenticationTest extends TestCase
 
     public function test_public_certificate_verification(): void
     {
-        $response = $this->getJson('/api/v1/public/verify-certificate/IAT-CCNA-98234');
+        $response = $this->getJson('/api/v1/public/verify-certificate/IAT-ACCA-98234');
 
         $response->assertStatus(200)
             ->assertJson([
                 'success' => true,
                 'data' => [
                     'is_valid' => true,
-                    'verification_code' => 'IAT-CCNA-98234',
+                    'verification_code' => 'IAT-ACCA-98234',
                 ],
             ]);
+
+        $this->getJson('/api/v1/public/verify-certificate/IAT-CERT-2026-00101')
+            ->assertOk()
+            ->assertJsonPath('data.certificate_number', 'IAT-CERT-2026-00101');
+    }
+
+    public function test_student_can_register_with_email_and_password_without_email_verification(): void
+    {
+        $course = Course::where('code', 'ACCA')->firstOrFail();
+        $batch = CourseBatch::where('course_id', $course->id)
+            ->whereIn('status', ['upcoming', 'ongoing'])
+            ->firstOrFail();
+
+        $response = $this->postJson('/api/v1/auth/register-student', [
+            'first_name' => 'Regular',
+            'last_name' => 'Student',
+            'email' => 'regular.student@example.test',
+            'phone' => '0712345678',
+            'password' => 'SecurePassword123',
+            'password_confirmation' => 'SecurePassword123',
+            'course_uuid' => $course->uuid,
+            'batch_uuid' => $batch->uuid,
+            'privacy_notice_accepted' => true,
+        ])->assertCreated()
+            ->assertJsonPath('data.user.email', 'regular.student@example.test')
+            ->assertJsonPath('data.user.is_student', true);
+
+        $student = User::where('email', 'regular.student@example.test')->firstOrFail();
+        $this->assertNotNull($student->privacy_notice_accepted_at);
+        $this->assertSame('2026-09-30', $student->privacy_notice_version);
+        $this->assertNull($student->email_verified_at);
+        $this->assertDatabaseHas('enrollments', [
+            'student_id' => $student->id,
+            'batch_id' => $batch->id,
+            'workflow_stage' => 'registered',
+        ]);
+        $this->assertNotEmpty($response->json('data.token'));
     }
 
     public function test_unauthenticated_api_requests_return_json_instead_of_redirecting_to_login(): void
@@ -72,6 +110,32 @@ class AuthenticationTest extends TestCase
 
         $response->assertUnauthorized()
             ->assertJsonStructure(['message']);
+    }
+
+    public function test_admin_can_configure_student_academic_support_contact_and_response_time(): void
+    {
+        $admin = User::where('email', 'superadmin@iatlms.test')->firstOrFail();
+        $organization = Organization::firstOrFail();
+        $settings = $organization->settings ?? [];
+        $settings['academic_support_email'] = 'academic.support@iat.ac.ke';
+        $settings['query_response_time'] = 'Within 1 business day';
+
+        $this->actingAs($admin, 'sanctum')
+            ->putJson('/api/v1/organization', [
+                'name' => $organization->name,
+                'email' => $organization->email,
+                'phone' => $organization->phone,
+                'website' => $organization->website,
+                'address' => $organization->address,
+                'settings' => $settings,
+            ])
+            ->assertOk();
+
+        $this->actingAs(User::where('email', 'student.john@iatlms.test')->firstOrFail(), 'sanctum')
+            ->getJson('/api/v1/organization')
+            ->assertOk()
+            ->assertJsonPath('data.settings.academic_support_email', 'academic.support@iat.ac.ke')
+            ->assertJsonPath('data.settings.query_response_time', 'Within 1 business day');
     }
 
     public function test_student_sees_only_their_acca_intake_unit_in_curriculum(): void
@@ -99,7 +163,42 @@ class AuthenticationTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonCount(1, 'data.units')
-            ->assertJsonPath('data.units.0.title', 'Applied Knowledge');
+            ->assertJsonPath('data.units.0.title', 'Fundamental Level')
+            ->assertJsonPath('data.units.0.modules.0.title', 'Applied Knowledge Module');
+    }
+
+    public function test_student_cannot_complete_lessons_outside_their_intake_module(): void
+    {
+        $student = User::where('email', 'student.john@iatlms.test')->firstOrFail();
+        $course = Course::where('code', 'ACCA')->firstOrFail();
+        $knowledgeBatch = CourseBatch::where('course_id', $course->id)
+            ->where('name', 'like', '%Applied Knowledge%')
+            ->firstOrFail();
+        $skillsLesson = $course->units()
+            ->where('title', 'Fundamental Level')
+            ->with('modules.lessons')
+            ->firstOrFail()
+            ->modules
+            ->firstWhere('title', 'Applied Skills Module')
+            ->lessons
+            ->firstOrFail();
+
+        Enrollment::query()->create([
+            'student_id' => $student->id,
+            'batch_id' => $knowledgeBatch->id,
+            'enrollment_number' => 'ENR-ACCA-SEQUENCE-GUARD',
+            'enrollment_date' => now()->toDateString(),
+            'status' => 'Active',
+            'workflow_stage' => 'in_training',
+        ]);
+
+        $this->actingAs($student, 'sanctum')
+            ->postJson('/api/v1/lessons/'.$skillsLesson->uuid.'/progress', [
+                'batch_uuid' => $knowledgeBatch->uuid,
+                'status' => 'completed',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'This lesson is not part of the selected intake curriculum.');
     }
 
     public function test_acca_student_can_complete_learning_and_receive_certificate(): void
@@ -147,9 +246,13 @@ class AuthenticationTest extends TestCase
             ->patchJson("/api/v1/enrollments/{$enrollment->uuid}/workflow", ['stage' => 'in_training'])
             ->assertOk();
 
-        $allLessons = $course->units()->with('modules.lessons')->get()
-            ->flatMap(fn ($unit) => $unit->modules->flatMap(fn ($module) => $module->lessons))
-            ->values();
+        $allLessons = $course->units()
+            ->where('title', 'Fundamental Level')
+            ->with('modules.lessons')
+            ->firstOrFail()
+            ->modules
+            ->firstWhere('title', 'Applied Knowledge Module')
+            ->lessons;
 
         foreach ($allLessons as $lesson) {
             $this->actingAs($student, 'sanctum')

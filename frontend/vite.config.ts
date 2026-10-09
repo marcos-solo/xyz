@@ -8,10 +8,19 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  build: {
+    outDir: '../backend/public',
+    emptyOutDir: false,
+  },
   server: {
     port: 5173,
     proxy: {
       '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/storage': {
         target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,

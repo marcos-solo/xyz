@@ -14,13 +14,17 @@ class OrganizationController extends Controller
     public function show(Request $request): JsonResponse
     {
         $org = Organization::first();
+        if ($org) {
+            $org->makeVisible(['settings']);
+        }
+
         return ApiResponse::success($org);
     }
 
     public function update(Request $request): JsonResponse
     {
         $user = $request->user();
-        if (!$user->hasRole('Super Admin') && !$user->can('organization.update')) {
+        if (! $user->hasRole('Super Admin') && ! $user->can('organization.update')) {
             return ApiResponse::forbidden();
         }
 
@@ -32,6 +36,9 @@ class OrganizationController extends Controller
             'website' => ['nullable', 'url'],
             'address' => ['nullable', 'string'],
             'settings' => ['nullable', 'array'],
+            'settings.learning_community_url' => ['nullable', 'url', 'max:2048'],
+            'settings.academic_support_email' => ['nullable', 'email', 'max:255'],
+            'settings.query_response_time' => ['nullable', 'string', 'max:120'],
         ]);
 
         $old = $org->toArray();

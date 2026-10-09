@@ -83,8 +83,6 @@ export const AppLayout: React.FC = () => {
           {isStudentPortalView ? (
             <GoogleSkillsNavbar
               onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
-              points={10405}
-              streak={3}
             />
           ) : (
             <TopNavbar onOpenMobileSidebar={() => setMobileSidebarOpen(true)} />

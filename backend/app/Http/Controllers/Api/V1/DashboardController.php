@@ -228,7 +228,7 @@ class DashboardController extends Controller
     public function getStudentDashboard(User $student): JsonResponse
     {
         $enrollments = Enrollment::where('student_id', $student->id)
-            ->with(['batch.course.modules.lessons', 'batch.trainers', 'finance'])
+            ->with(['batch.course.modules.lessons', 'batch.course.units.modules.lessons', 'batch.assessments', 'batch.trainers', 'finance'])
             ->get();
 
         $courseProgressList = CourseProgress::where('user_id', $student->id)
@@ -443,6 +443,15 @@ class DashboardController extends Controller
                 'final_score' => $e->final_score,
                 'start_date' => $e->batch?->start_date?->format('Y-m-d'),
                 'end_date' => $e->batch?->end_date?->format('Y-m-d'),
+                'progress_percentage' => (float) ($progressByBatch->get($e->batch_id)?->progress_percentage ?? 0),
+                'trainers' => $e->batch?->trainers->map(fn (User $trainer) => [
+                    'uuid' => $trainer->uuid,
+                    'name' => $trainer->full_name,
+                    'email' => $trainer->email,
+                    'phone' => $trainer->phone,
+                    'role' => $trainer->pivot?->role_type,
+                ])->values() ?? collect(),
+                'course_timeline' => $this->buildCourseTimeline($e),
                 'days_remaining' => $e->batch?->end_date ? max(0, Carbon::today()->diffInDays($e->batch->end_date, false)) : null,
                 'lessons_remaining' => max(0, ($progressByBatch->get($e->batch_id)?->total_lessons_count ?? 0) - ($progressByBatch->get($e->batch_id)?->completed_lessons_count ?? 0)),
                 'modules_remaining' => max(0, ($progressByBatch->get($e->batch_id)?->total_modules_count ?? 0) - ($progressByBatch->get($e->batch_id)?->completed_modules_count ?? 0)),
@@ -508,5 +517,152 @@ class DashboardController extends Controller
             ])->values(),
             'unread_notifications_count' => $student->unreadNotifications()->count(),
         ]);
+    }
+
+    private function buildCourseTimeline(Enrollment $enrollment): array
+    {
+        $batch = $enrollment->batch;
+        $course = $batch?->course;
+
+        if (! $batch?->start_date || ! $batch?->end_date) {
+            return [];
+        }
+
+        $startDate = Carbon::parse($batch->start_date)->startOfDay();
+        $scheduledMock = $batch->assessments
+            ->filter(fn (Assessment $assessment) => str_contains(strtolower($assessment->title.' '.$assessment->type), 'mock'))
+            ->sortBy('due_date')
+            ->first();
+        $mockDate = $scheduledMock?->due_date
+            ? Carbon::parse($scheduledMock->due_date)->startOfDay()
+            : Carbon::parse($batch->end_date)->startOfDay();
+        $mockDateIsEstimate = ! $scheduledMock?->due_date;
+
+        if ($mockDate->lt($startDate)) {
+            $mockDate = Carbon::parse($batch->end_date)->startOfDay();
+            $mockDateIsEstimate = true;
+        }
+
+        $units = $course?->units ?? collect();
+        $matchedUnitTitle = null;
+        $matchedModuleKeyword = null;
+
+        if (strtoupper((string) $course?->code) === 'ACCA') {
+            $batchName = strtolower((string) $batch->name);
+
+            if (str_contains($batchName, 'knowledge') || str_contains($batchName, 'ak')) {
+                $matchedUnitTitle = 'Fundamental Level';
+                $matchedModuleKeyword = 'Applied Knowledge';
+            } elseif (str_contains($batchName, 'skill') || str_contains($batchName, 'as')) {
+                $matchedUnitTitle = 'Fundamental Level';
+                $matchedModuleKeyword = 'Applied Skills';
+            } elseif (str_contains($batchName, 'fundamental')) {
+                $matchedUnitTitle = 'Fundamental Level';
+            } elseif (str_contains($batchName, 'strategic') || str_contains($batchName, 'sp')) {
+                $matchedUnitTitle = 'Strategic Professional Level';
+                if (empty($batch->curriculum_lesson_uuids)) {
+                    $matchedModuleKeyword = 'Essentials';
+                }
+            } elseif (str_contains($batchName, 'foundation') || str_contains($batchName, 'fia')) {
+                $matchedUnitTitle = 'Foundation Level';
+            }
+
+            if ($matchedUnitTitle) {
+                $units = $units
+                    ->filter(fn ($unit) => str_contains(strtolower((string) $unit->title), strtolower($matchedUnitTitle)))
+                    ->values();
+            }
+
+            if ($matchedModuleKeyword) {
+                foreach ($units as $unit) {
+                    $unit->setRelation('modules', $unit->modules
+                        ->filter(fn ($module) => str_contains(strtolower((string) $module->title), strtolower($matchedModuleKeyword)))
+                        ->values());
+                }
+            }
+        }
+
+        $coverage = $units->flatMap(fn ($unit) => $unit->modules->flatMap(function ($module) use ($unit) {
+            $lessons = $module->lessons->map(fn ($lesson) => [
+                'uuid' => $lesson->uuid,
+                'title' => $lesson->title,
+                'unit' => $unit->title,
+                'module' => $module->title,
+            ]);
+
+            return $lessons->isNotEmpty() ? $lessons : collect([[
+                'title' => $module->title,
+                'unit' => $unit->title,
+                'module' => null,
+            ]]);
+        })) ?? collect();
+
+        if ($coverage->isEmpty() && empty($batch->curriculum_lesson_uuids) && ! $matchedUnitTitle) {
+            $coverage = $course?->modules?->map(fn ($module) => [
+                'title' => $module->title,
+                'unit' => null,
+                'module' => null,
+            ]) ?? collect();
+        }
+
+        if (! empty($batch->curriculum_lesson_uuids)) {
+            $selectedLessonUuids = $batch->curriculum_lesson_uuids;
+            $coverage = $coverage->filter(fn ($item) => in_array($item['uuid'] ?? null, $selectedLessonUuids, true))->values();
+        }
+
+        if ($coverage->isEmpty() && empty($batch->curriculum_lesson_uuids)) {
+            $coverage = $units->map(fn ($unit) => [
+                'title' => $unit->title,
+                'unit' => null,
+                'module' => null,
+            ]) ?? collect();
+        }
+
+        $today = Carbon::today();
+        $timeline = [[
+            'type' => 'onboarding',
+            'title' => 'Onboarding & orientation',
+            'coverage' => 'Induction, learning platform setup, and course expectations',
+            'start_date' => $startDate->toDateString(),
+            'end_date' => $startDate->toDateString(),
+            'is_estimate' => false,
+            'status' => $today->gt($startDate) ? 'past' : ($today->equalTo($startDate) ? 'current' : 'upcoming'),
+        ]];
+
+        $coverageStart = $startDate->copy()->addDay();
+        if ($coverageStart->gt($mockDate)) {
+            $coverageStart = $mockDate->copy();
+        }
+        $coverageDays = max(0, $coverageStart->diffInDays($mockDate, false));
+        $coverageCount = $coverage->count();
+
+        foreach ($coverage->values() as $index => $module) {
+            $startOffset = (int) floor($coverageDays * $index / $coverageCount);
+            $endOffset = max($startOffset, (int) floor($coverageDays * ($index + 1) / $coverageCount) - 1);
+            $moduleStart = $coverageStart->copy()->addDays($startOffset);
+            $moduleEnd = $coverageStart->copy()->addDays($endOffset);
+
+            $timeline[] = [
+                'type' => 'coursework',
+                'title' => $module['title'],
+                'coverage' => $module['module'] ?: $module['unit'],
+                'start_date' => $moduleStart->toDateString(),
+                'end_date' => $moduleEnd->toDateString(),
+                'is_estimate' => true,
+                'status' => $today->gt($moduleEnd) ? 'past' : ($today->gte($moduleStart) ? 'current' : 'upcoming'),
+            ];
+        }
+
+        $timeline[] = [
+            'type' => 'mock_exam',
+            'title' => 'Mock exam & revision',
+            'coverage' => $scheduledMock?->title ?? 'Full-course revision and mock assessment',
+            'start_date' => $mockDate->toDateString(),
+            'end_date' => $mockDate->toDateString(),
+            'is_estimate' => $mockDateIsEstimate,
+            'status' => $today->gt($mockDate) ? 'past' : ($today->equalTo($mockDate) ? 'current' : 'upcoming'),
+        ];
+
+        return $timeline;
     }
 }

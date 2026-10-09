@@ -2,13 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Models\Course;
 use App\Models\CourseBatch;
 use App\Models\Enrollment;
 use App\Models\User;
 use App\Notifications\FeedbackSubmittedNotification;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class NotificationAndFeedbackTest extends TestCase
@@ -124,5 +127,54 @@ class NotificationAndFeedbackTest extends TestCase
                     ],
                 ],
             ]);
+    }
+
+    public function test_student_and_assigned_trainer_can_comment_on_a_module(): void
+    {
+        $student = User::where('email', 'student.jane@iatlms.test')->firstOrFail();
+        $trainer = User::role('Trainer')->firstOrFail();
+        $batch = CourseBatch::where('name', 'like', '%Applied Skills%')->firstOrFail();
+        $batch->trainers()->syncWithoutDetaching([$trainer->id]);
+        $module = Course::where('code', 'ACCA')->firstOrFail()
+            ->units()->where('title', 'Fundamental Level')->with('modules.lessons')->firstOrFail()
+            ->modules->firstWhere('title', 'Applied Skills Module');
+
+        $this->actingAs($student, 'sanctum')
+            ->postJson("/api/v1/modules/{$module->uuid}/comments", [
+                'batch_uuid' => $batch->uuid,
+                'body' => 'I would appreciate another worked example for this module.',
+            ])
+            ->assertCreated();
+
+        $this->actingAs($trainer, 'sanctum')
+            ->getJson("/api/v1/modules/{$module->uuid}/comments?batch_uuid={$batch->uuid}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data.comments')
+            ->assertJsonPath('data.comments.0.student.uuid', $student->uuid);
+
+        $this->actingAs($trainer, 'sanctum')
+            ->postJson("/api/v1/modules/{$module->uuid}/comments", [
+                'batch_uuid' => $batch->uuid,
+                'student_uuid' => $student->uuid,
+                'body' => 'We will work through an additional example in the next session.',
+            ])
+            ->assertCreated();
+
+        $this->assertDatabaseCount('course_module_comments', 2);
+    }
+
+    public function test_trainer_can_upload_a_lesson_video(): void
+    {
+        Storage::fake('public');
+        $admin = User::where('email', 'superadmin@iatlms.test')->firstOrFail();
+
+        $response = $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/v1/lessons/videos/upload', [
+                'video' => UploadedFile::fake()->create('lesson.mp4', 512, 'video/mp4'),
+            ])
+            ->assertCreated();
+
+        Storage::disk('public')->assertExists($response->json('data.file_path'));
+        $this->assertStringContainsString('/storage/lesson-videos/', $response->json('data.video_url'));
     }
 }

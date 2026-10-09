@@ -128,6 +128,7 @@ export const CurriculumBuilderPage: React.FC = () => {
     video_url: '',
     duration: 45,
   });
+  const [videoUploading, setVideoUploading] = useState(false);
 
   const fetchCourse = async () => {
     setLoading(true);
@@ -212,6 +213,23 @@ export const CurriculumBuilderPage: React.FC = () => {
       fetchCourse();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to add lesson.');
+    }
+  };
+
+  const handleVideoUpload = async (file?: File) => {
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('video', file);
+    setVideoUploading(true);
+    try {
+      const response = await api.post('/lessons/videos/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setLessonForm((current) => ({ ...current, video_url: response.data.data.video_url }));
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to upload lesson video.');
+    } finally {
+      setVideoUploading(false);
     }
   };
 
@@ -730,7 +748,15 @@ export const CurriculumBuilderPage: React.FC = () => {
 
           {lessonForm.content_type === 'video' && (
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Video Stream URL</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Video File or Stream URL</label>
+              <input
+                type="file"
+                accept="video/mp4,video/webm,video/ogg,video/quicktime"
+                disabled={videoUploading}
+                onChange={(event) => handleVideoUpload(event.target.files?.[0])}
+                className="mb-2 block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-[#fff1f2] file:px-3 file:py-2 file:text-xs file:font-bold file:text-[#73111b] hover:file:bg-rose-100"
+              />
+              {videoUploading && <p className="mb-2 text-[11px] text-slate-500">Uploading video...</p>}
               <input
                 type="url"
                 value={lessonForm.video_url}

@@ -21,6 +21,15 @@ const formatBatchDate = (value?: string): string => {
   }).format(new Date(`${normalized}T00:00:00`));
 };
 
+interface BatchCurriculumPaper {
+  uuid: string;
+  title: string;
+  unitUuid: string;
+  unitTitle: string;
+  moduleUuid: string;
+  moduleTitle: string;
+}
+
 export const BatchesListPage: React.FC = () => {
   const { hasPermission } = useAuth();
   const [batches, setBatches] = useState<CourseBatch[]>([]);
@@ -43,6 +52,10 @@ export const BatchesListPage: React.FC = () => {
   const [assignOpen, setAssignOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<CourseBatch | null>(null);
   const [selectedTrainerIds, setSelectedTrainerIds] = useState<string[]>([]);
+  const [curriculumPapers, setCurriculumPapers] = useState<BatchCurriculumPaper[]>([]);
+  const [curriculumLoading, setCurriculumLoading] = useState(false);
+  const [selectedUnitUuid, setSelectedUnitUuid] = useState('');
+  const [selectedModuleUuid, setSelectedModuleUuid] = useState('');
 
   const [formData, setFormData] = useState({
     course_uuid: '',
@@ -51,6 +64,7 @@ export const BatchesListPage: React.FC = () => {
     code: '',
     start_date: '',
     end_date: '',
+    curriculum_lesson_uuids: [] as string[],
     capacity: 25,
     status: 'ongoing',
   });
@@ -78,8 +92,108 @@ export const BatchesListPage: React.FC = () => {
     fetchBatches();
   }, [branchFilter, categoryFilter, courseFilter, statusFilter, fromDate, toDate, page]);
 
+  useEffect(() => {
+    if ((!createOpen && !editOpen) || !formData.course_uuid) {
+      setCurriculumPapers([]);
+      return;
+    }
+
+    let active = true;
+    setCurriculumLoading(true);
+    api.get(`/courses/${formData.course_uuid}`, { params: { all_units: true } })
+      .then((response) => {
+        if (!active) return;
+        const course = response.data.data;
+        const papers: BatchCurriculumPaper[] = (course.units || []).flatMap((unit: any) =>
+          (unit.modules || []).flatMap((module: any) => (module.lessons || []).map((lesson: any) => ({
+            uuid: lesson.uuid,
+            title: lesson.title,
+            unitUuid: unit.uuid,
+            unitTitle: unit.title,
+            moduleUuid: module.uuid,
+            moduleTitle: module.title,
+          }))),
+        );
+        setCurriculumPapers(papers);
+
+        const batchName = formData.name.toLowerCase();
+        const initialUnit = (course.units || []).find((unit: any) => {
+          const title = unit.title.toLowerCase();
+          if (batchName.includes('strategic') || batchName.includes(' sp')) return title.includes('strategic');
+          if (batchName.includes('foundation') || batchName.includes('fia')) return title.includes('foundation');
+          if (batchName.includes('knowledge') || batchName.includes(' ak') || batchName.includes('skill') || batchName.includes(' as')) return title.includes('fundamental');
+          return false;
+        }) || course.units?.[0];
+        setSelectedUnitUuid(initialUnit?.uuid || '');
+
+        const existingSelection = formData.curriculum_lesson_uuids;
+        if (existingSelection.length) {
+          setFormData((current) => ({ ...current, curriculum_lesson_uuids: existingSelection }));
+        } else if (initialUnit) {
+          const initialUnitPapers = papers.filter((paper) => paper.unitUuid === initialUnit.uuid);
+          const initialModule = initialUnitPapers.find((paper) =>
+            paper.moduleTitle.toLowerCase().includes('applied knowledge') && batchName.includes('knowledge'),
+          )?.moduleUuid || initialUnitPapers.find((paper) =>
+            paper.moduleTitle.toLowerCase().includes('applied skills') && batchName.includes('skill'),
+          )?.moduleUuid || initialUnitPapers[0]?.moduleUuid || '';
+          setSelectedModuleUuid(initialModule);
+          const defaults = initialUnit.title.toLowerCase().includes('strategic')
+            ? initialUnitPapers.filter((paper) => paper.moduleTitle.toLowerCase() === 'essentials').map((paper) => paper.uuid)
+            : initialUnitPapers.filter((paper) => paper.moduleUuid === initialModule).map((paper) => paper.uuid);
+          setFormData((current) => ({ ...current, curriculum_lesson_uuids: defaults }));
+        }
+      })
+      .catch(() => {
+        if (active) setCurriculumPapers([]);
+      })
+      .finally(() => {
+        if (active) setCurriculumLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [formData.course_uuid, createOpen, editOpen]);
+
+  const selectedCourse = courses.find((course) => course.uuid === formData.course_uuid);
+  const isAccaBatch = selectedCourse?.code?.toUpperCase() === 'ACCA';
+  const selectedUnit = curriculumPapers.find((paper) => paper.unitUuid === selectedUnitUuid);
+  const strategicUnit = selectedUnit?.unitTitle.toLowerCase().includes('strategic') ?? false;
+  const unitPapers = curriculumPapers.filter((paper) => paper.unitUuid === selectedUnitUuid);
+  const moduleOptions = [...new Map(unitPapers.map((paper) => [paper.moduleUuid, { uuid: paper.moduleUuid, title: paper.moduleTitle }])).values()];
+  const selectedModulePapers = unitPapers.filter((paper) => paper.moduleUuid === selectedModuleUuid);
+  const strategicOptions = unitPapers.filter((paper) => paper.moduleTitle.toLowerCase().includes('options'));
+  const selectedStrategicOptionUuids = strategicOptions.filter((paper) => formData.curriculum_lesson_uuids.includes(paper.uuid)).map((paper) => paper.uuid);
+
+  const selectCurriculumUnit = (unitUuid: string) => {
+    const papers = curriculumPapers.filter((paper) => paper.unitUuid === unitUuid);
+    const unit = papers[0]?.unitTitle.toLowerCase() || '';
+    const module = unit.includes('strategic')
+      ? ''
+      : papers[0]?.moduleUuid || '';
+    setSelectedUnitUuid(unitUuid);
+    setSelectedModuleUuid(module);
+    const defaults = unit.includes('strategic')
+      ? papers.filter((paper) => paper.moduleTitle.toLowerCase() === 'essentials').map((paper) => paper.uuid)
+      : papers.filter((paper) => paper.moduleUuid === module).map((paper) => paper.uuid);
+    setFormData((current) => ({ ...current, curriculum_lesson_uuids: defaults }));
+  };
+
+  const toggleCurriculumPaper = (paperUuid: string, limit?: number) => {
+    setFormData((current) => {
+      const selected = current.curriculum_lesson_uuids;
+      if (selected.includes(paperUuid)) {
+        return { ...current, curriculum_lesson_uuids: selected.filter((uuid) => uuid !== paperUuid) };
+      }
+      if (limit && strategicOptions.filter((paper) => selected.includes(paper.uuid)).length >= limit) return current;
+      return { ...current, curriculum_lesson_uuids: [...selected, paperUuid] };
+    });
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isAccaBatch && strategicUnit && selectedStrategicOptionUuids.length !== 2) {
+      alert('Select exactly two Strategic Professional option papers.');
+      return;
+    }
     try {
       await api.post('/batches', formData);
       setCreateOpen(false);
@@ -100,13 +214,20 @@ export const BatchesListPage: React.FC = () => {
       end_date: dateOnly(b.end_date),
       capacity: b.capacity || 25,
       status: b.status || 'ongoing',
+      curriculum_lesson_uuids: b.curriculum_lesson_uuids || [],
     });
+    setSelectedUnitUuid('');
+    setSelectedModuleUuid('');
     setEditOpen(true);
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBatch) return;
+    if (isAccaBatch && strategicUnit && selectedStrategicOptionUuids.length !== 2) {
+      alert('Select exactly two Strategic Professional option papers.');
+      return;
+    }
     try {
       await api.put(`/batches/${selectedBatch.uuid}`, formData);
       setEditOpen(false);
@@ -178,6 +299,84 @@ export const BatchesListPage: React.FC = () => {
     }
   };
 
+  const curriculumPicker = isAccaBatch && (
+    <section className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div>
+        <h3 className="text-xs font-bold text-slate-800">ACCA curriculum for this intake</h3>
+        <p className="mt-0.5 text-[11px] text-slate-500">Students in this batch will see only the selected level and papers.</p>
+      </div>
+      {curriculumLoading ? (
+        <p className="text-xs text-slate-500">Loading course papers...</p>
+      ) : curriculumPapers.length === 0 ? (
+        <p className="text-xs text-amber-700">No curriculum papers are available for this course yet.</p>
+      ) : (
+        <>
+          <label className="block text-[11px] font-bold text-slate-700">
+            ACCA level
+            <select value={selectedUnitUuid} onChange={(event) => selectCurriculumUnit(event.target.value)} className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-slate-800">
+              {[...new Map(curriculumPapers.map((paper) => [paper.unitUuid, paper.unitTitle])).entries()].map(([uuid, title]) => <option key={uuid} value={uuid}>{title}</option>)}
+            </select>
+          </label>
+
+          {!strategicUnit && moduleOptions.length > 1 && (
+            <label className="block text-[11px] font-bold text-slate-700">
+              Study module
+              <select
+                value={selectedModuleUuid}
+                onChange={(event) => {
+                  const moduleUuid = event.target.value;
+                  setSelectedModuleUuid(moduleUuid);
+                  setFormData((current) => ({ ...current, curriculum_lesson_uuids: unitPapers.filter((paper) => paper.moduleUuid === moduleUuid).map((paper) => paper.uuid) }));
+                }}
+                className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-slate-800"
+              >
+                {moduleOptions.map((module) => <option key={module.uuid} value={module.uuid}>{module.title}</option>)}
+              </select>
+            </label>
+          )}
+
+          <div className="space-y-3">
+            {strategicUnit ? (
+              <>
+                <div>
+                  <p className="text-[11px] font-bold text-slate-700">Mandatory papers</p>
+                  {unitPapers.filter((paper) => paper.moduleTitle.toLowerCase() === 'essentials').map((paper) => (
+                    <label key={paper.uuid} className="mt-1 flex items-center gap-2 text-xs text-slate-700">
+                      <input type="checkbox" checked disabled className="accent-[#73111b]" />{paper.title}
+                      <span className="text-[10px] text-slate-400">Required</span>
+                    </label>
+                  ))}
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-slate-700">Choose exactly 2 option papers ({selectedStrategicOptionUuids.length}/2)</p>
+                  {strategicOptions.map((paper) => {
+                    const selected = formData.curriculum_lesson_uuids.includes(paper.uuid);
+                    return (
+                      <label key={paper.uuid} className="mt-1 flex items-center gap-2 text-xs text-slate-700">
+                        <input type="checkbox" checked={selected} disabled={!selected && selectedStrategicOptionUuids.length >= 2} onChange={() => toggleCurriculumPaper(paper.uuid, 2)} className="accent-[#73111b] disabled:opacity-40" />
+                        {paper.title}
+                      </label>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              <div>
+                <p className="text-[11px] font-bold text-slate-700">Papers included ({selectedModulePapers.filter((paper) => formData.curriculum_lesson_uuids.includes(paper.uuid)).length}/{selectedModulePapers.length})</p>
+                {selectedModulePapers.map((paper) => (
+                  <label key={paper.uuid} className="mt-1 flex items-center gap-2 text-xs text-slate-700">
+                    <input type="checkbox" checked={formData.curriculum_lesson_uuids.includes(paper.uuid)} onChange={() => toggleCurriculumPaper(paper.uuid)} className="accent-[#73111b]" />
+                    {paper.title}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </section>
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -196,9 +395,12 @@ export const BatchesListPage: React.FC = () => {
                 code: '',
                 start_date: '',
                 end_date: '',
+                curriculum_lesson_uuids: [],
                 capacity: 25,
                 status: 'ongoing',
               });
+              setSelectedUnitUuid('');
+              setSelectedModuleUuid('');
               setCreateOpen(true);
             }}
             className="px-4 py-2.5 rounded-xl bg-[#73111b] hover:bg-[#5c0d15] text-xs font-bold text-white shadow-md shadow-[#73111b]/20 flex items-center gap-2 transition"
@@ -279,7 +481,7 @@ export const BatchesListPage: React.FC = () => {
               <select
                 required
                 value={formData.course_uuid}
-                onChange={(e) => setFormData({ ...formData, course_uuid: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, course_uuid: e.target.value, curriculum_lesson_uuids: [] })}
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-[#73111b]"
               >
                 <option value="">Select Course</option>
@@ -303,6 +505,8 @@ export const BatchesListPage: React.FC = () => {
               </select>
             </div>
           </div>
+
+          {curriculumPicker}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -393,7 +597,7 @@ export const BatchesListPage: React.FC = () => {
               <select
                 required
                 value={formData.course_uuid}
-                onChange={(e) => setFormData({ ...formData, course_uuid: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, course_uuid: e.target.value, curriculum_lesson_uuids: [] })}
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-[#73111b]"
               >
                 <option value="">Select Course</option>
@@ -417,6 +621,8 @@ export const BatchesListPage: React.FC = () => {
               </select>
             </div>
           </div>
+
+          {curriculumPicker}
 
           <div className="grid grid-cols-2 gap-3">
             <div>

@@ -23,6 +23,7 @@ class CourseBatch extends Model
         'code',
         'start_date',
         'end_date',
+        'curriculum_lesson_uuids',
         'capacity',
         'status',
     ];
@@ -32,6 +33,7 @@ class CourseBatch extends Model
         return [
             'start_date' => 'date',
             'end_date' => 'date',
+            'curriculum_lesson_uuids' => 'array',
             'capacity' => 'integer',
         ];
     }

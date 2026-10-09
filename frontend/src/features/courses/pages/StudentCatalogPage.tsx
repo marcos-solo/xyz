@@ -21,6 +21,8 @@ import {
   Send,
   Loader2,
   AlertCircle,
+  FileText,
+  Download,
 } from 'lucide-react';
 
 interface CourseItem {
@@ -137,7 +139,7 @@ export const StudentCatalogPage: React.FC = () => {
     setCourseDetailLoading(true);
 
     try {
-      const res = await api.get(`/courses/${course.uuid}`);
+      const res = await api.get(`/courses/${course.uuid}`, { params: { all_units: 1 } });
       if (res.data.success) {
         setFullCourseDetails(res.data.data);
         if (res.data.data.batches?.length > 0) {
@@ -197,6 +199,10 @@ export const StudentCatalogPage: React.FC = () => {
 
     const matchesCategory =
       selectedCategory === 'all' ||
+      (selectedCategory === 'foundation' && (c.description || '').toLowerCase().includes('foundation')) ||
+      (selectedCategory === 'knowledge' && (c.description || '').toLowerCase().includes('knowledge')) ||
+      (selectedCategory === 'skills' && (c.description || '').toLowerCase().includes('skills')) ||
+      (selectedCategory === 'professional' && (c.description || '').toLowerCase().includes('professional')) ||
       (c.category?.name || '').toLowerCase().includes(selectedCategory.toLowerCase());
 
     const matchesLevel =
@@ -213,16 +219,16 @@ export const StudentCatalogPage: React.FC = () => {
           <div className="flex items-center gap-2 mb-0.5">
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/15 text-rose-200 border border-white/20">
               <Sparkles className="h-3 w-3 text-amber-400" />
-              Academic Catalog
+              ACCA Qualification Portal
             </span>
-            <span className="text-[11px] text-rose-200/70 font-medium">ACCA • Cisco • Cyber • BI</span>
+            <span className="text-[11px] text-rose-200/70 font-medium">All 22 Official Syllabuses • CBE Exam Pathways • Professional Intakes</span>
           </div>
           <h1 className="text-base sm:text-lg font-bold tracking-tight text-white">
-            Courses, Certifications & Learning Pathways
+            ACCA Qualifications & Official Syllabus Guides
           </h1>
         </div>
         <p className="text-[11px] text-slate-200/80 max-w-xs hidden md:block text-right">
-          Accredited qualifications and cohort intakes for career advancement.
+          Official chartered accountancy syllabus study guides and accredited cohort intakes.
         </p>
       </section>
 
@@ -236,7 +242,7 @@ export const StudentCatalogPage: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by qualification, paper or keyword (e.g. ACCA, TX, Cisco)..."
+              placeholder="Search ACCA papers, topics or keywords (e.g. SBL, FR, TX, Taxation, FA1)..."
               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#73111b] focus:bg-white transition"
             />
           </div>
@@ -269,14 +275,14 @@ export const StudentCatalogPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Category Pills */}
+        {/* Category / Level Pills */}
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
           {[
-            { id: 'all', label: 'All Fields' },
-            { id: 'acca', label: 'ACCA & Accounting' },
-            { id: 'cisco', label: 'Cisco Networking' },
-            { id: 'cyber', label: 'Cybersecurity' },
-            { id: 'bi', label: 'Power BI & Analytics' },
+            { id: 'all', label: 'All ACCA Levels' },
+            { id: 'foundation', label: 'Foundation / FIA (7 Papers)' },
+            { id: 'knowledge', label: 'Applied Knowledge (3 Papers)' },
+            { id: 'skills', label: 'Applied Skills (6 Papers)' },
+            { id: 'professional', label: 'Strategic Professional (6 Papers)' },
           ].map((cat) => (
             <button
               key={cat.id}
@@ -531,37 +537,82 @@ export const StudentCatalogPage: React.FC = () => {
 
               {/* Syllabus Units / Modules */}
               <div>
-                <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[10px] mb-2">
-                  Curriculum Units & Papers
-                </h4>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[10px]">
+                    Curriculum Units & Papers (Official ACCA Syllabuses)
+                  </h4>
+                  <span className="text-[10px] font-bold text-[#73111b] bg-[#fff1f2] border border-[#fecdd3] px-2 py-0.5 rounded-full">
+                    22 CBE Syllabuses Included
+                  </span>
+                </div>
                 {courseDetailLoading ? (
                   <div className="py-6 flex justify-center text-slate-400">
                     <Loader2 className="h-5 w-5 animate-spin text-[#73111b]" />
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {fullCourseDetails?.units?.map((u: any, idx: number) => (
-                      <div key={u.id || idx} className="p-3 rounded-2xl bg-slate-50 border border-slate-200/70">
-                        <div className="flex items-center justify-between font-bold text-slate-900">
-                          <span>{u.title}</span>
-                          <span className="text-[10px] text-slate-400">{u.modules?.length || 0} Modules</span>
-                        </div>
-                        {u.modules && u.modules.length > 0 && (
-                          <div className="mt-2 pl-3 border-l-2 border-[#73111b]/30 space-y-1 text-slate-600">
-                            {u.modules.map((m: any) => (
-                              <div key={m.id} className="flex items-center justify-between text-[11px]">
-                                <span>{m.title}</span>
-                                <span className="text-slate-400">{m.lessons?.length || 0} lessons</span>
+                  <div className="space-y-3">
+                    {fullCourseDetails?.units?.map((u: any, idx: number) => {
+                      const totalPapers = u.modules?.reduce((acc: number, m: any) => acc + (m.lessons?.length || 0), 0) || 0;
+                      return (
+                        <div key={u.id || idx} className="rounded-2xl bg-slate-50 border border-slate-200 overflow-hidden">
+                          <div className="px-3.5 py-2.5 bg-slate-100/80 border-b border-slate-200/70 flex items-center justify-between font-bold text-slate-900">
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-[#73111b] text-white flex items-center justify-center text-[10px]">
+                                {idx + 1}
+                              </span>
+                              <span className="text-xs">{u.title}</span>
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-semibold">
+                              {totalPapers} {totalPapers === 1 ? 'Paper' : 'Papers'}
+                            </span>
+                          </div>
+                          <div className="p-3 space-y-3">
+                            {u.modules?.map((m: any) => (
+                              <div key={m.id} className="space-y-1.5">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                  {m.title}
+                                </p>
+                                <div className="space-y-1.5">
+                                  {m.lessons?.map((les: any) => {
+                                    const filePath = les.file_path
+                                      ? (les.file_path.startsWith('/') ? les.file_path : `/${les.file_path}`)
+                                      : null;
+                                    return (
+                                      <div
+                                        key={les.id}
+                                        className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200/80 hover:border-[#73111b]/40 transition text-xs"
+                                      >
+                                        <div className="flex items-center gap-2 min-w-0 pr-2">
+                                          <FileText className="h-3.5 w-3.5 text-[#73111b] shrink-0" />
+                                          <span className="font-semibold text-slate-800 truncate">
+                                            {les.title}
+                                          </span>
+                                        </div>
+                                        {filePath && (
+                                          <a
+                                            href={filePath}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#fff1f2] hover:bg-[#73111b] text-[#73111b] hover:text-white border border-[#fecdd3] text-[10px] font-bold transition shadow-2xs"
+                                          >
+                                            <Download className="h-3 w-3" />
+                                            <span>Syllabus Guide</span>
+                                          </a>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
                             ))}
                           </div>
-                        )}
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
 
                     {(!fullCourseDetails?.units || fullCourseDetails.units.length === 0) && (
                       <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/70 text-slate-500">
-                        Standard full-length accredited curriculum covering theory, revision, and CBE mock drills.
+                        Official ACCA full qualification curriculum covering FIA, Applied Knowledge, Applied Skills, and Strategic Professional CBE papers.
                       </div>
                     )}
                   </div>

@@ -96,6 +96,37 @@ export const SystemSettingsPage: React.FC = () => {
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-[#73111b]"
                 />
               </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 mb-1">Online Learning Community (WhatsApp Channel)</label>
+                <input
+                  type="url"
+                  value={org.settings?.learning_community_url || ''}
+                  onChange={(e) => setOrg({ ...org, settings: { ...(org.settings || {}), learning_community_url: e.target.value } })}
+                  placeholder="https://whatsapp.com/channel/..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-[#73111b]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Academic & Exam Support Email</label>
+                <input
+                  type="email"
+                  value={org.settings?.academic_support_email || ''}
+                  onChange={(e) => setOrg({ ...org, settings: { ...(org.settings || {}), academic_support_email: e.target.value } })}
+                  placeholder={org.email || 'academic@institution.org'}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-[#73111b]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Student Query Response Time</label>
+                <input
+                  type="text"
+                  value={org.settings?.query_response_time || 'Within 2 business days'}
+                  onChange={(e) => setOrg({ ...org, settings: { ...(org.settings || {}), query_response_time: e.target.value } })}
+                  placeholder="Within 2 business days"
+                  maxLength={120}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-[#73111b]"
+                />
+              </div>
             </div>
           </Card>
         )}

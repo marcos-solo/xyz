@@ -34,6 +34,8 @@ class User extends Authenticatable
         'position_id',
         'status',
         'email_verified_at',
+        'privacy_notice_accepted_at',
+        'privacy_notice_version',
         'last_login_at',
         'last_login_ip',
     ];
@@ -47,6 +49,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'privacy_notice_accepted_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
         ];

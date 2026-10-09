@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AlertCircle, ArrowRight, Lock, Mail, UserPlus, Compass } from 'lucide-react';
+import { AlertCircle, ArrowRight, Compass, UserPlus } from 'lucide-react';
 import { IatLogo } from '../../../components/common/IatLogo';
 import api from '../../../api/client';
 import { useAuth } from '../../../context/AuthContext';
@@ -35,6 +35,7 @@ export const StudentRegistrationPage: React.FC = () => {
   const [courseUuid, setCourseUuid] = useState('');
   const [batchUuid, setBatchUuid] = useState('');
   const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', password: '', password_confirmation: '' });
+  const [privacyNoticeAccepted, setPrivacyNoticeAccepted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -54,7 +55,12 @@ export const StudentRegistrationPage: React.FC = () => {
     setSubmitting(true);
     setError('');
     try {
-      const response = await api.post('/auth/register-student', { ...form, course_uuid: courseUuid, batch_uuid: batchUuid });
+      const response = await api.post('/auth/register-student', {
+        ...form,
+        course_uuid: courseUuid,
+        batch_uuid: batchUuid,
+        privacy_notice_accepted: privacyNoticeAccepted,
+      });
       const { token, user } = response.data.data;
       login(token, user);
       navigate('/my-courses', { replace: true });
@@ -72,7 +78,7 @@ export const StudentRegistrationPage: React.FC = () => {
         <div className="text-center">
           <div className="mb-4 inline-block rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"><IatLogo size="md" /></div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Apply for student admission</h1>
-          <p className="mt-2 text-sm text-slate-500">Choose your course and preferred intake. Admissions will review your application before finance clearance.</p>
+          <p className="mt-2 text-sm text-slate-500">Create your account, choose a course and intake, then submit your admission application.</p>
         </div>
 
         {error && <div className="mt-6 flex gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-medium text-rose-700"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
@@ -112,7 +118,24 @@ export const StudentRegistrationPage: React.FC = () => {
             <label className="text-xs font-bold text-slate-700">Password<input required minLength={8} type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm font-normal outline-none focus:border-[#73111b] focus:bg-white" /></label>
             <label className="text-xs font-bold text-slate-700">Confirm password<input required minLength={8} type="password" value={form.password_confirmation} onChange={(event) => setForm({ ...form, password_confirmation: event.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm font-normal outline-none focus:border-[#73111b] focus:bg-white" /></label>
           </div>
-          <button type="submit" disabled={submitting || loading || !availableBatches.length} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#73111b] py-3.5 text-sm font-bold text-white shadow-md shadow-[#73111b]/20 transition hover:bg-[#5c0d15] disabled:cursor-not-allowed disabled:opacity-50"><UserPlus className="h-4 w-4" />{submitting ? 'Submitting application...' : 'Submit application'}<ArrowRight className="h-4 w-4" /></button>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+            <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-relaxed text-slate-600">
+              <input
+                type="checkbox"
+                required
+                checked={privacyNoticeAccepted}
+                onChange={(event) => setPrivacyNoticeAccepted(event.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-[#73111b]"
+              />
+              <span>
+                I acknowledge that the personal information I provide will be used to process my application and manage my student account, in accordance with Kenya's Data Protection Act, 2019 and other applicable data protection requirements, including the GDPR where applicable.
+              </span>
+            </label>
+            <p className="mt-2 pl-6 text-[10px] leading-relaxed text-slate-500">
+              Please provide accurate information. You may contact IAT to ask about access, correction, or other rights over your personal data.
+            </p>
+          </div>
+          <button type="submit" disabled={submitting || loading || !availableBatches.length || !privacyNoticeAccepted} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#73111b] py-3.5 text-sm font-bold text-white shadow-md shadow-[#73111b]/20 transition hover:bg-[#5c0d15] disabled:cursor-not-allowed disabled:opacity-50"><UserPlus className="h-4 w-4" />{submitting ? 'Submitting application...' : 'Submit application'}<ArrowRight className="h-4 w-4" /></button>
         </form>
 
         <p className="mt-6 text-center text-xs text-slate-500">Already registered? <Link to="/login" className="font-bold text-[#73111b] hover:underline">Sign in</Link></p>

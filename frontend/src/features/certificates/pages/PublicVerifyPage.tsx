@@ -2,30 +2,41 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import api from '../../../api/client';
 import { IatLogo } from '../../../components/common/IatLogo';
-import { ShieldCheck, ShieldAlert, Award, Building, Calendar, CheckCircle2, User, BookOpen } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Award, Building, Calendar, CheckCircle2, User, BookOpen, Search } from 'lucide-react';
 
 export const PublicVerifyPage: React.FC = () => {
   const { code } = useParams<{ code: string }>();
-  const [loading, setLoading] = useState(true);
+  const [searchValue, setSearchValue] = useState(code || '');
+  const [loading, setLoading] = useState(false);
   const [cert, setCert] = useState<any>(null);
   const [error, setError] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
 
   useEffect(() => {
-    const verifyCert = async () => {
-      setLoading(true);
-      try {
-        const res = await api.get(`/public/verify-certificate/${code}`);
-        if (res.data.success) {
-          setCert(res.data.data);
-        }
-      } catch (err: any) {
-        setError(err.response?.data?.message || 'Certificate verification failed or invalid code.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (code) verifyCert();
+    setSearchValue(code || '');
+    setCert(null);
+    setError('');
+    setHasSearched(false);
   }, [code]);
+
+  const handleSearch = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const certificateNumber = searchValue.trim();
+    if (!certificateNumber) return;
+
+    setLoading(true);
+    setError('');
+    setCert(null);
+    setHasSearched(true);
+    try {
+      const res = await api.get(`/public/verify-certificate/${encodeURIComponent(certificateNumber)}`);
+      if (res.data.success) setCert(res.data.data);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'No certificate matched that number. Check it and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center p-4 sm:p-6">
@@ -39,10 +50,33 @@ export const PublicVerifyPage: React.FC = () => {
           <p className="text-xs text-slate-500">Cryptographically verifiable certificate authenticating student qualification</p>
         </div>
 
-        {/* Verification Card */}
-        <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
-          {loading ? (
-            <div className="py-20 text-center text-xs text-slate-400">Verifying credential code {code}...</div>
+        <form onSubmit={handleSearch} className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <label htmlFor="certificate-number" className="mb-1.5 block text-xs font-bold text-slate-800">Certificate number</label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              id="certificate-number"
+              type="text"
+              required
+              value={searchValue}
+              onChange={(event) => setSearchValue(event.target.value)}
+              placeholder="Enter the certificate number"
+              autoComplete="off"
+              className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-sm text-slate-900 outline-none transition focus:border-[#73111b] focus:bg-white focus:ring-1 focus:ring-[#73111b]"
+            />
+            <button type="submit" disabled={loading || !searchValue.trim()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#73111b] px-5 py-3 text-xs font-bold text-white transition hover:bg-[#5c0d15] disabled:cursor-not-allowed disabled:opacity-50">
+              <Search className="h-4 w-4" />
+              {loading ? 'Searching...' : 'Search certificate'}
+            </button>
+          </div>
+          <p className="mt-2 text-[10px] leading-relaxed text-slate-500">Certificate details appear only after you submit a certificate number.</p>
+        </form>
+
+        {/* Results remain empty until a visitor submits a search. */}
+        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
+          {!hasSearched ? (
+            <div className="py-12 text-center text-xs text-slate-500">Enter the number printed on a certificate to check its status.</div>
+          ) : loading ? (
+            <div className="py-12 text-center text-xs text-slate-500">Checking the certificate number you submitted...</div>
           ) : error ? (
             <div className="p-8 text-center space-y-3">
               <div className="h-16 w-16 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center mx-auto text-rose-600">

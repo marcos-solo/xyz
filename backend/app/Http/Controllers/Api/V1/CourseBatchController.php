@@ -7,6 +7,7 @@ use App\Http\Responses\ApiResponse;
 use App\Models\Branch;
 use App\Models\Course;
 use App\Models\CourseBatch;
+use App\Models\Lesson;
 use App\Models\Organization;
 use App\Services\AuditLogService;
 use App\Services\BranchScopeService;
@@ -90,6 +91,8 @@ class CourseBatchController extends Controller
             'code' => ['required', 'string', 'max:50'],
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'curriculum_lesson_uuids' => ['nullable', 'array', 'max:22'],
+            'curriculum_lesson_uuids.*' => ['required', 'uuid', 'distinct', 'exists:lessons,uuid'],
             'capacity' => ['required', 'integer', 'min:1'],
             'status' => ['nullable', 'in:upcoming,ongoing,completed,cancelled'],
             'trainer_ids' => ['nullable', 'array'],
@@ -99,6 +102,15 @@ class CourseBatchController extends Controller
         $course = Course::where('uuid', $validated['course_uuid'])->firstOrFail();
         $branch = Branch::where('uuid', $validated['branch_uuid'])->firstOrFail();
 
+        $selectionError = $this->validateCurriculumSelection(
+            $course,
+            $validated['name'],
+            $validated['curriculum_lesson_uuids'] ?? [],
+        );
+        if ($selectionError) {
+            return $selectionError;
+        }
+
         $batch = CourseBatch::create([
             'organization_id' => $org->id,
             'course_id' => $course->id,
@@ -107,6 +119,7 @@ class CourseBatchController extends Controller
             'code' => $validated['code'],
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
+            'curriculum_lesson_uuids' => $validated['curriculum_lesson_uuids'] ?? null,
             'capacity' => $validated['capacity'],
             'status' => $validated['status'] ?? 'upcoming',
         ]);
@@ -150,11 +163,28 @@ class CourseBatchController extends Controller
             'code' => ['sometimes', 'required', 'string', 'max:50'],
             'start_date' => ['sometimes', 'required', 'date'],
             'end_date' => ['sometimes', 'required', 'date'],
+            'curriculum_lesson_uuids' => ['sometimes', 'nullable', 'array', 'max:22'],
+            'curriculum_lesson_uuids.*' => ['required', 'uuid', 'distinct', 'exists:lessons,uuid'],
             'capacity' => ['sometimes', 'required', 'integer', 'min:1'],
             'status' => ['nullable', 'in:upcoming,ongoing,completed,cancelled'],
         ]);
 
         $old = $batch->toArray();
+
+        if (array_key_exists('curriculum_lesson_uuids', $validated)) {
+            $courseId = isset($validated['course_uuid'])
+                ? Course::where('uuid', $validated['course_uuid'])->value('id')
+                : $batch->course_id;
+            $course = Course::findOrFail($courseId);
+            $selectionError = $this->validateCurriculumSelection(
+                $course,
+                $validated['name'] ?? $batch->name,
+                $validated['curriculum_lesson_uuids'] ?? [],
+            );
+            if ($selectionError) {
+                return $selectionError;
+            }
+        }
 
         if (array_key_exists('course_uuid', $validated)) {
             $batch->course_id = Course::where('uuid', $validated['course_uuid'])->value('id');
@@ -169,6 +199,23 @@ class CourseBatchController extends Controller
         AuditLogService::log('batch.update', $batch, $old, $batch->toArray());
 
         return ApiResponse::success($batch->load(['course', 'branch', 'trainers']), 'Batch updated.');
+    }
+
+    public function destroy(Request $request, CourseBatch $batch): JsonResponse
+    {
+        $authUser = $request->user();
+        if (! $authUser->can('batches.delete')) {
+            return ApiResponse::forbidden();
+        }
+
+        if ($batch->status === 'ongoing') {
+            return ApiResponse::error('Cannot delete an ongoing batch. Archive it instead.', 422);
+        }
+
+        $batch->delete();
+        AuditLogService::log('batch.delete', $batch);
+
+        return ApiResponse::success(null, 'Batch archived successfully.');
     }
 
     /**
@@ -197,5 +244,53 @@ class CourseBatchController extends Controller
         AuditLogService::log('batch.trainers_assigned', $batch, null, $validated['trainers']);
 
         return ApiResponse::success($batch->load('trainers'), 'Batch trainers assigned successfully.');
+    }
+
+    private function validateCurriculumSelection(Course $course, string $batchName, array $lessonUuids): ?JsonResponse
+    {
+        $isStrategicAccaBatch = strtoupper((string) $course->code) === 'ACCA'
+            && (str_contains(strtolower($batchName), 'strategic') || preg_match('/\bsp\b/i', $batchName));
+
+        if ($isStrategicAccaBatch && count($lessonUuids) === 0) {
+            return ApiResponse::error('Select the two mandatory Strategic Professional papers and exactly two option papers.', 422);
+        }
+
+        if ($lessonUuids === []) {
+            return null;
+        }
+
+        $selectedLessons = Lesson::whereIn('uuid', $lessonUuids)
+            ->with('module.unit')
+            ->get();
+
+        if ($selectedLessons->count() !== count($lessonUuids)
+            || $selectedLessons->contains(fn (Lesson $lesson) => $lesson->module?->course_id !== $course->id)) {
+            return ApiResponse::error('Selected papers must belong to the chosen course.', 422);
+        }
+
+        if ($isStrategicAccaBatch) {
+            $selectedStrategicLessons = $selectedLessons->filter(fn (Lesson $lesson) => $lesson->module?->unit?->title === 'Strategic Professional Level'
+            );
+            $requiredEssentials = Lesson::whereHas('module', fn ($module) => $module
+                ->where('title', 'Essentials')
+                ->whereHas('unit', fn ($unit) => $unit->where('title', 'Strategic Professional Level')))
+                ->whereHas('module', fn ($module) => $module->where('course_id', $course->id))
+                ->pluck('uuid');
+            $selectedEssentialUuids = $selectedStrategicLessons
+                ->filter(fn (Lesson $lesson) => $lesson->module?->title === 'Essentials')
+                ->pluck('uuid');
+            $selectedOptionCount = $selectedStrategicLessons
+                ->filter(fn (Lesson $lesson) => str_contains(strtolower((string) $lesson->module?->title), 'options'))
+                ->count();
+
+            if ($selectedStrategicLessons->count() !== $selectedLessons->count()
+                || $selectedStrategicLessons->count() !== $requiredEssentials->count() + 2
+                || $requiredEssentials->diff($selectedEssentialUuids)->isNotEmpty()
+                || $selectedOptionCount !== 2) {
+                return ApiResponse::error('Strategic Professional batches require both Essentials papers and exactly two option papers.', 422);
+            }
+        }
+
+        return null;
     }
 }
